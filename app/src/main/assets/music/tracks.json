@@ -1,0 +1,22 @@
+{
+  "rate": 22050,
+  "tail": 11025,
+  "tracks": [
+    {"file": "01-crimson-index.mp3", "title": "Crimson Index", "samples": 846720},
+    {"file": "02-lantern-hall.mp3", "title": "Lantern Hall", "samples": 846720},
+    {"file": "03-moonlit-corridor.mp3", "title": "Moonlit Corridor", "samples": 756000},
+    {"file": "04-clocktower-waltz.mp3", "title": "Clocktower Waltz", "samples": 690261},
+    {"file": "05-cathedral-of-ash.mp3", "title": "Cathedral of Ash", "samples": 1176000},
+    {"file": "06-bloodmoon-gate.mp3", "title": "Bloodmoon Gate", "samples": 572108},
+    {"file": "07-night-stair.mp3", "title": "Night Stair", "samples": 793800},
+    {"file": "08-moonlit-corridor-harpsichord.mp3", "title": "Moonlit Corridor (harpsichord)", "samples": 756000},
+    {"file": "09-clocktower-waltz-harpsichord.mp3", "title": "Clocktower Waltz (harpsichord)", "samples": 690261},
+    {"file": "10-crypt-of-bells.mp3", "title": "Crypt of Bells", "samples": 1008000},
+    {"file": "11-requiem-of-candles.mp3", "title": "Requiem of Candles", "samples": 1411200},
+    {"file": "12-cathedral-of-ash-pipe-organ.mp3", "title": "Cathedral of Ash (pipe organ)", "samples": 1282909},
+    {"file": "13-masquerade-of-thorns.mp3", "title": "Masquerade of Thorns", "samples": 721636},
+    {"file": "14-night-stair-gothic.mp3", "title": "Night Stair (gothic)", "samples": 793800},
+    {"file": "15-raven-spire.mp3", "title": "Raven Spire", "samples": 756000},
+    {"file": "16-ashen-dawn.mp3", "title": "Ashen Dawn", "samples": 882000}
+  ]
+}

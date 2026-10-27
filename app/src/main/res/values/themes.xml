@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Maroon ground, cream type. Flat, no shadows. -->
+    <style name="Theme.PdfScan" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#FF4A1521</item>
+        <item name="android:colorPrimaryDark">#FF4A1521</item>
+        <item name="android:colorAccent">#FFF4EBDD</item>
+        <item name="android:colorControlNormal">#FFCDB4A5</item>
+        <item name="android:colorControlActivated">#FFF4EBDD</item>
+        <item name="android:colorControlHighlight">#3DF4EBDD</item>
+        <item name="android:colorBackground">#FF4A1521</item>
+        <item name="android:windowBackground">@color/maroon</item>
+        <item name="android:statusBarColor">#FF4A1521</item>
+        <item name="android:navigationBarColor">#FF4A1521</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:textColorPrimary">#FFF4EBDD</item>
+        <item name="android:textColorSecondary">#FFCDB4A5</item>
+        <item name="android:textColorHint">#FFCDB4A5</item>
+        <item name="android:alertDialogTheme">@style/Theme.PdfScan.Dialog</item>
+    </style>
+
+    <style name="Theme.PdfScan.Dialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">#FF561A28</item>
+        <item name="android:colorAccent">#FFF4EBDD</item>
+        <item name="android:colorControlNormal">#FFCDB4A5</item>
+        <item name="android:colorControlActivated">#FFF4EBDD</item>
+        <item name="android:textColorPrimary">#FFF4EBDD</item>
+        <item name="android:textColorSecondary">#FFCDB4A5</item>
+        <item name="android:textColorHint">#FFCDB4A5</item>
+        <item name="android:windowBackground">@drawable/dialog_background</item>
+    </style>
+
+    <!-- AMOLED black: true black ground, cream type, maroon secondary text and accents. -->
+    <style name="Theme.PdfScan.Black" parent="Theme.PdfScan">
+        <item name="android:colorPrimary">#FF000000</item>
+        <item name="android:colorPrimaryDark">#FF000000</item>
+        <item name="android:colorBackground">#FF000000</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">#FF000000</item>
+        <item name="android:navigationBarColor">#FF000000</item>
+        <item name="android:colorControlNormal">#FFC25468</item>
+        <item name="android:textColorSecondary">#FFC25468</item>
+        <item name="android:textColorHint">#FFC25468</item>
+        <item name="android:alertDialogTheme">@style/Theme.PdfScan.Black.Dialog</item>
+    </style>
+
+    <style name="Theme.PdfScan.Black.Dialog" parent="Theme.PdfScan.Dialog">
+        <item name="android:colorBackground">#FF160A0D</item>
+        <item name="android:colorControlNormal">#FFC25468</item>
+        <item name="android:textColorSecondary">#FFC25468</item>
+        <item name="android:textColorHint">#FFC25468</item>
+        <item name="android:windowBackground">@drawable/dialog_background_black</item>
+    </style>
+
+    <!-- Full-screen camera: no window background behind the preview. -->
+    <style name="Theme.PdfScan.Camera" parent="Theme.PdfScan">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">#FF000000</item>
+        <item name="android:navigationBarColor">#FF000000</item>
+    </style>
+</resources>

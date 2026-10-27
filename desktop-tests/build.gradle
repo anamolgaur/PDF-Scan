@@ -1,0 +1,55 @@
+// Unit tests for the parts of the app that are plain Java (page detection, filters, PDF writer
+// and reader, Office text, search, Drive sign-in maths, backup, music). They run on a normal
+// desktop JDK, because they draw test images with java.awt, which Android's unit-test setup
+// leaves out. The app's own source files are compiled here directly; nothing is duplicated.
+plugins {
+    id 'java'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['../app/src/main/java']
+            include 'com/anamol/pdfscan/ScanMath.java'
+            include 'com/anamol/pdfscan/SearchCore.java'
+            include 'com/anamol/pdfscan/DriveCore.java'
+            include 'com/anamol/pdfscan/PdfWriter.java'
+            include 'com/anamol/pdfscan/PdfText.java'
+            include 'com/anamol/pdfscan/Glyphs.java'
+            include 'com/anamol/pdfscan/OfficeText.java'
+            include 'com/anamol/pdfscan/ImageOps.java'
+            include 'com/anamol/pdfscan/Backup.java'
+            include 'com/anamol/pdfscan/ChiptuneSynth.java'
+            include 'com/anamol/pdfscan/GothicSynth.java'
+            include 'com/anamol/pdfscan/Soundtrack.java'
+            include 'com/anamol/pdfscan/GothicClassics.java'
+            include 'com/anamol/pdfscan/GothicNocturnes.java'
+            include 'com/anamol/pdfscan/BarcodeCore.java'
+            include 'com/anamol/pdfscan/PdfOverlay.java'
+        }
+        resources.srcDirs = []
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+dependencies {
+    implementation 'com.google.zxing:core:3.5.3'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test {
+    systemProperty 'java.awt.headless', 'true'
+    if (System.getProperty('pdfscan.out') != null) systemProperty 'pdfscan.out', System.getProperty('pdfscan.out')
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+    }
+}

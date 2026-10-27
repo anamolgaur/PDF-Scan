@@ -1,0 +1,22 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        // Tesseract OCR (Apache-2.0, fully offline, no telemetry)
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+rootProject.name = 'PdfScanner'
+include ':app'
+// Desktop JDK unit tests for the plain-Java parts of the app (see desktop-tests/build.gradle)
+include ':desktop-tests'

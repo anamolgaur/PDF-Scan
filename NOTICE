@@ -1,0 +1,11 @@
+PDF Scan
+Copyright 2026 Anamol Gaur
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+The music in app/src/main/assets/music is licensed under CC BY 4.0 (see LICENSE-MUSIC.txt).
+
+This product includes third-party software and data:
+- Tesseract4Android, Tesseract OCR and the tessdata_fast English model (Apache License 2.0)
+- Leptonica (BSD 2-Clause style license), libjpeg (IJG license), libpng (libpng license)
+- DM Sans and Sora fonts (SIL Open Font License 1.1, see third_party/)
+See THIRD_PARTY_NOTICES.md for details.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Viewfinder brackets around a page. Text lines are cut out so the maroon ground shows through. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="1.12"
+        android:scaleY="1.12">
+        <path
+            android:pathData="M30,39 V31 H38 M70,31 H78 V39 M78,69 V77 H70 M38,77 H30 V69"
+            android:strokeWidth="3.6"
+            android:strokeColor="#FFF4EBDD"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFF4EBDD"
+            android:fillType="evenOdd"
+            android:pathData="M43,38 H60 L67,45 V68 A2,2 0 0 1 65,70 H43 A2,2 0 0 1 41,68 V40 A2,2 0 0 1 43,38 Z M45.5,48 h17 v2.6 h-17 Z M45.5,53.5 h17 v2.6 h-17 Z M45.5,59 h17 v2.6 h-17 Z M45.5,64.5 h10 v2.6 h-10 Z" />
+        <path
+            android:fillColor="#FFD9C3AE"
+            android:pathData="M60,38 V45 H67 Z" />
+    </group>
+</vector>

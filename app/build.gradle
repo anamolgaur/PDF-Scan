@@ -1,0 +1,96 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Optional Google Drive OAuth client (type "Desktop app"). Read from local.properties or the
+// environment so it never has to be committed. Without it the app builds and works; only the
+// Drive link is unavailable. See README, "Google Drive setup".
+def localProps = new Properties()
+def localFile = rootProject.file('local.properties')
+if (localFile.exists()) localFile.withInputStream { localProps.load(it) }
+def driveClientId = localProps.getProperty('drive.clientId', System.getenv('DRIVE_CLIENT_ID') ?: '')
+def driveClientSecret = localProps.getProperty('drive.clientSecret', System.getenv('DRIVE_CLIENT_SECRET') ?: '')
+
+// Release signing key. Kept out of the repository: keystore.properties (git-ignored) says where
+// the key file is and its password. Without it, release builds are left unsigned.
+def keyProps = new Properties()
+def keyFile = rootProject.file('keystore.properties')
+if (keyFile.exists()) keyFile.withInputStream { keyProps.load(it) }
+
+android {
+    namespace 'com.anamol.pdfscan'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.anamol.pdfscan'
+        minSdk 29
+        targetSdk 34
+        versionCode 15
+        versionName '7.2'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'String', 'DRIVE_CLIENT_ID', "\"${driveClientId}\""
+        buildConfigField 'String', 'DRIVE_CLIENT_SECRET', "\"${driveClientSecret}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        if (keyProps.getProperty('storeFile')) {
+            release {
+                storeFile file(keyProps.getProperty('storeFile'))
+                storePassword keyProps.getProperty('storePassword')
+                keyAlias keyProps.getProperty('keyAlias')
+                keyPassword keyProps.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // smaller and faster: unused code and resources are removed
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keyProps.getProperty('storeFile')) signingConfig signingConfigs.release
+        }
+    }
+
+    // Compress the native OCR libraries inside the APK: a smaller file to copy to the phone.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
+    // One APK per processor type, plus a universal one that runs on every Android device
+    // (phones, tablets, Chromebooks, emulators).
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            universalApk true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Third-party libraries: the Tesseract OCR engine, runs entirely on-device.
+    implementation 'cz.adaptech.tesseract4android:tesseract4android:4.7.0'
+
+    // QR codes and barcodes, decoded on the phone (Apache-2.0, pure Java, no network).
+    implementation 'com.google.zxing:core:3.5.3'
+
+    // Unit tests live in the desktop-tests module (plain JDK, so they can use java.awt).
+    // Device tests (src/androidTest) run on an emulator in GitHub Actions; not part of the app.
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
