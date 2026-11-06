@@ -643,4 +643,219 @@ final class ScanMath {
         }
         return r;
     }
+
+    // ------------------------------------------------------------------ corner refinement
+
+    /**
+     * Snaps rough corners (found on a small picture) onto the page's real edges in a larger
+     * picture. Each side is searched across its width at many points for the strongest
+     * page-to-background step, a straight line is fitted through those points (ignoring stray
+     * ones: text, shadows, fingers), and the corners become where neighbouring lines cross.
+     * Works even when a corner itself is covered or slightly outside the frame. Returns the
+     * rough corners unchanged if the edges can't be found reliably.
+     */
+    static float[] refineCorners(int[] px, int w, int h, float[] rough) {
+        if (rough == null || w < 32 || h < 32) return rough;
+        float[] g = new float[w * h];
+        for (int i = 0; i < g.length; i++) g[i] = luma(px[i]);
+        float[] c = rough.clone();
+        int big = Math.max(w, h);
+        float[] bands = {Math.max(6f, big * 0.035f), Math.max(3f, big * 0.008f)};
+        boolean moved = false;
+        for (float band : bands) {
+            float[] next = refineOnce(g, w, h, c, band);
+            if (next == null) break;
+            c = next;
+            moved = true;
+        }
+        if (!moved) return rough;
+        // a hair inside the edge, so no sliver of desk shows along the border
+        c = inset(c, w, h, Math.max(1f, big * 0.0015f));
+        float a0 = quadArea(rough), a1 = quadArea(c);
+        if (a1 < a0 * 0.8f || a1 > a0 * 1.25f || !convex(c)) return rough;
+        for (int i = 0; i < 8; i++) c[i] = Math.max(0f, Math.min(1f, c[i]));
+        return c;
+    }
+
+    private static float sample(float[] g, int w, int h, float x, float y) {
+        if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return Float.NaN;
+        int x0 = (int) x, y0 = (int) y;
+        int x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1);
+        float fx = x - x0, fy = y - y0;
+        float a = g[y0 * w + x0] * (1 - fx) + g[y0 * w + x1] * fx;
+        float b = g[y1 * w + x0] * (1 - fx) + g[y1 * w + x1] * fx;
+        return a * (1 - fy) + b * fy;
+    }
+
+    /** One pass: returns new normalised corners, or null when too few edges were found. */
+    private static float[] refineOnce(float[] g, int w, int h, float[] c, float band) {
+        float fw = w - 1f, fh = h - 1f;
+        float[] X = new float[4], Y = new float[4];
+        for (int i = 0; i < 4; i++) {
+            X[i] = c[i * 2] * fw;
+            Y[i] = c[i * 2 + 1] * fh;
+        }
+        float cx = (X[0] + X[1] + X[2] + X[3]) / 4f, cy = (Y[0] + Y[1] + Y[2] + Y[3]) / 4f;
+        float[][] lines = new float[4][];  // {px, py, dx, dy}: a point and a unit direction
+        int fitted = 0;
+        final int N = 48;
+        int steps = Math.max(8, Math.round(band * 2));
+        for (int s = 0; s < 4; s++) {
+            float x0 = X[s], y0 = Y[s], x1 = X[(s + 1) % 4], y1 = Y[(s + 1) % 4];
+            float len = (float) Math.hypot(x1 - x0, y1 - y0);
+            if (len < 8) return null;
+            float tx = (x1 - x0) / len, ty = (y1 - y0) / len;
+            float nx = -ty, ny = tx;
+            float mx = (x0 + x1) / 2f, my = (y0 + y1) / 2f;
+            if ((mx - cx) * nx + (my - cy) * ny < 0) {
+                nx = -nx;
+                ny = -ny;
+            }  // n points out of the page
+            float[][] prof = new float[N][];
+            float inSum = 0, outSum = 0;
+            for (int k = 0; k < N; k++) {
+                float t = 0.08f + 0.84f * k / (N - 1f);
+                float bx = x0 + (x1 - x0) * t, by = y0 + (y1 - y0) * t;
+                float[] v = new float[steps * 2 + 1];
+                boolean ok = true;
+                for (int j = -steps; j <= steps; j++) {
+                    float d = band * j / steps;
+                    float acc = 0;
+                    int cnt = 0;
+                    for (int q = -1; q <= 1; q++) {  // a little along the edge, against noise
+                        float val = sample(g, w, h, bx + d * nx + q * 1.5f * tx, by + d * ny + q * 1.5f * ty);
+                        if (!Float.isNaN(val)) {
+                            acc += val;
+                            cnt++;
+                        }
+                    }
+                    if (cnt == 0) {
+                        v[j + steps] = Float.NaN;
+                        ok = j > 0;  // running off the frame outside the page is fine
+                    } else {
+                        v[j + steps] = acc / cnt;
+                    }
+                }
+                if (!ok) continue;
+                prof[k] = v;
+                for (int j = 0; j < steps; j++) if (!Float.isNaN(v[j])) inSum += v[j];
+                for (int j = steps + 1; j < v.length; j++) if (!Float.isNaN(v[j])) outSum += v[j];
+            }
+            float sign = inSum >= outSum ? 1f : -1f;  // page lighter than what is around it?
+            List<float[]> pts = new ArrayList<>();
+            for (int k = 0; k < N; k++) {
+                float[] v = prof[k];
+                if (v == null) continue;
+                float t = 0.08f + 0.84f * k / (N - 1f);
+                float bx = x0 + (x1 - x0) * t, by = y0 + (y1 - y0) * t;
+                float best = 0;
+                int bestJ = Integer.MIN_VALUE;
+                for (int j = 1; j < v.length - 1; j++) {
+                    if (Float.isNaN(v[j - 1]) || Float.isNaN(v[j + 1])) continue;
+                    float step = sign * (v[j - 1] - v[j + 1]);
+                    float d = Math.abs(j - steps) / (float) steps;
+                    float score = step * (1f - 0.25f * d);  // prefer edges near the guess
+                    if (score > best) {
+                        best = score;
+                        bestJ = j;
+                    }
+                }
+                float perPx = best / (2f * band / steps);
+                if (bestJ == Integer.MIN_VALUE || perPx < 3f) continue;
+                float d = band * (bestJ - steps) / steps;
+                pts.add(new float[]{bx + d * nx, by + d * ny});
+            }
+            float[] line = fitLine(pts, N);
+            if (line != null) {
+                float dot = Math.abs(line[2] * tx + line[3] * ty);
+                float off = Math.abs((line[0] - mx) * nx + (line[1] - my) * ny);
+                if (dot < 0.985f || off > band) line = null;  // turned more than ~10 degrees, or wandered
+            }
+            if (line == null) {
+                line = new float[]{x0, y0, tx, ty};
+            } else {
+                fitted++;
+            }
+            lines[s] = line;
+        }
+        if (fitted < 2) return null;
+        float[] out = new float[8];
+        for (int i = 0; i < 4; i++) {
+            float[] a = lines[(i + 3) % 4], b = lines[i];
+            float den = a[2] * b[3] - a[3] * b[2];
+            if (Math.abs(den) < 0.2f) return null;
+            float u = ((b[0] - a[0]) * b[3] - (b[1] - a[1]) * b[2]) / den;
+            float x = a[0] + u * a[2], y = a[1] + u * a[3];
+            if (x < -0.05f * fw || x > 1.05f * fw || y < -0.05f * fh || y > 1.05f * fh) return null;
+            out[i * 2] = x / fw;
+            out[i * 2 + 1] = y / fh;
+        }
+        return out;
+    }
+
+    /** Straight line through edge points, dropping outliers. Null with too little support. */
+    private static float[] fitLine(List<float[]> pts, int tried) {
+        List<float[]> use = new ArrayList<>(pts);
+        float[] line = null;
+        for (int round = 0; round < 3; round++) {
+            if (use.size() < Math.max(6, tried * 0.4f)) return null;
+            double sx = 0, sy = 0;
+            for (float[] p : use) {
+                sx += p[0];
+                sy += p[1];
+            }
+            double mx = sx / use.size(), my = sy / use.size();
+            double xx = 0, xy = 0, yy = 0;
+            for (float[] p : use) {
+                double dx = p[0] - mx, dy = p[1] - my;
+                xx += dx * dx;
+                xy += dx * dy;
+                yy += dy * dy;
+            }
+            double ang = 0.5 * Math.atan2(2 * xy, xx - yy);
+            line = new float[]{(float) mx, (float) my, (float) Math.cos(ang), (float) Math.sin(ang)};
+            float[] res = new float[use.size()];
+            for (int i = 0; i < res.length; i++) res[i] = dist(line, use.get(i));
+            float[] sorted = res.clone();
+            java.util.Arrays.sort(sorted);
+            float limit = Math.max(1.5f, sorted[sorted.length / 2] * 2.5f);
+            List<float[]> keep = new ArrayList<>();
+            for (int i = 0; i < res.length; i++) if (res[i] <= limit) keep.add(use.get(i));
+            if (keep.size() == use.size()) break;
+            use = keep;
+        }
+        return use.size() >= Math.max(6, tried * 0.4f) ? line : null;
+    }
+
+    private static float dist(float[] line, float[] p) {
+        return Math.abs((p[0] - line[0]) * line[3] - (p[1] - line[1]) * line[2]);
+    }
+
+    private static float[] inset(float[] c, int w, int h, float pxIn) {
+        float fw = w - 1f, fh = h - 1f;
+        float cx = (c[0] + c[2] + c[4] + c[6]) / 4f * fw, cy = (c[1] + c[3] + c[5] + c[7]) / 4f * fh;
+        float[] o = c.clone();
+        for (int i = 0; i < 4; i++) {
+            float dx = cx - c[i * 2] * fw, dy = cy - c[i * 2 + 1] * fh;
+            float len = (float) Math.hypot(dx, dy);
+            if (len <= 0) continue;
+            float m = pxIn * 1.414f / len;
+            o[i * 2] = (c[i * 2] * fw + dx * m) / fw;
+            o[i * 2 + 1] = (c[i * 2 + 1] * fh + dy * m) / fh;
+        }
+        return o;
+    }
+
+    static boolean convex(float[] c) {
+        float sign = 0;
+        for (int i = 0; i < 4; i++) {
+            float ax = c[((i + 1) % 4) * 2] - c[i * 2], ay = c[((i + 1) % 4) * 2 + 1] - c[i * 2 + 1];
+            float bx = c[((i + 2) % 4) * 2] - c[((i + 1) % 4) * 2], by = c[((i + 2) % 4) * 2 + 1] - c[((i + 1) % 4) * 2 + 1];
+            float z = ax * by - ay * bx;
+            if (z == 0) return false;
+            if (sign == 0) sign = Math.signum(z);
+            else if (Math.signum(z) != sign) return false;
+        }
+        return true;
+    }
 }

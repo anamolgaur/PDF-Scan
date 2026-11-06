@@ -101,18 +101,48 @@ final class ImageProcessor {
 
     // ------------------------------------------------------------------ page rendering
 
+    /**
+     * Finds the page: the on-device network first, the classic detector as a backup, then the
+     * corners are snapped onto the page's edges. Call off the main thread.
+     */
     static float[] detectCorners(Bitmap b) {
-        float s = 320f / Math.max(b.getWidth(), b.getHeight());
-        Bitmap small = s < 1f
-                ? Bitmap.createScaledBitmap(b, Math.max(8, Math.round(b.getWidth() * s)),
-                Math.max(8, Math.round(b.getHeight() * s)), true)
+        float s = Math.min(1f, 1400f / Math.max(b.getWidth(), b.getHeight()));
+        Bitmap mid = s < 1f
+                ? Bitmap.createScaledBitmap(b, Math.max(32, Math.round(b.getWidth() * s)),
+                Math.max(32, Math.round(b.getHeight() * s)), true)
                 : b;
-        int w = small.getWidth();
-        int h = small.getHeight();
-        int[] px = new int[w * h];
-        small.getPixels(px, 0, w, 0, 0, w, h);
-        if (small != b) small.recycle();
-        return ScanMath.detectCorners(px, w, h);
+        try {
+            int w = mid.getWidth();
+            int h = mid.getHeight();
+            int[] px = new int[w * h];
+            mid.getPixels(px, 0, w, 0, 0, w, h);
+            return PageFind.corners(PageModel.get(), px, w, h);
+        } catch (OutOfMemoryError e) {
+            return null;
+        } finally {
+            if (mid != b) mid.recycle();
+        }
+    }
+
+    /** Snaps rough corners onto the page's real edges, using a sharper copy of the picture. */
+    static float[] refineCorners(Bitmap b, float[] rough) {
+        if (rough == null) return null;
+        float s = Math.min(1f, 1400f / Math.max(b.getWidth(), b.getHeight()));
+        Bitmap mid = s < 1f
+                ? Bitmap.createScaledBitmap(b, Math.max(32, Math.round(b.getWidth() * s)),
+                Math.max(32, Math.round(b.getHeight() * s)), true)
+                : b;
+        try {
+            int w = mid.getWidth();
+            int h = mid.getHeight();
+            int[] px = new int[w * h];
+            mid.getPixels(px, 0, w, 0, 0, w, h);
+            return ScanMath.refineCorners(px, w, h, rough);
+        } catch (OutOfMemoryError e) {
+            return rough;
+        } finally {
+            if (mid != b) mid.recycle();
+        }
     }
 
     /** Applies look settings, cleanup and mark-up to a cropped page. Returns a new bitmap. */

@@ -11,6 +11,7 @@ open-source components below, each under its own license.
 | [Leptonica](https://github.com/DanBloomberg/leptonica) | Image handling for Tesseract (native library inside Tesseract4Android) | BSD 2-Clause style ("Leptonica license") |
 | libjpeg and libpng | Image codecs used by Leptonica (native libraries inside Tesseract4Android) | IJG license / libpng license |
 | [tessdata_fast `eng.traineddata`](https://github.com/tesseract-ocr/tessdata_fast) | English recognition model, committed at `app/src/main/assets/tessdata/` | Apache License 2.0 |
+| [DocAligner](https://github.com/DocsaidLab/DocAligner) page-corner model (`lcnet100_h_e_bifpn_256`) by DocsaidLab | Finding the page's corners in photos. Converted to `app/src/main/assets/pagenet.bin` by `tools/pagenet_export.py` and run by the app's own code (`PageNet.java`); no ML library is bundled | Apache License 2.0 (`third_party/LICENSE-DocAligner.txt`) |
 | [ZXing core](https://github.com/zxing/zxing) 3.5.3 | QR code and barcode reading on the phone (Gradle dependency, pure Java) | Apache License 2.0 |
 | [tessdata_best `eng.traineddata`](https://github.com/tesseract-ocr/tessdata_best) | Optional high-accuracy English model, downloaded on request, not bundled | Apache License 2.0 |
 | tessdata_fast models for other languages | Downloaded on request from the same repository, not bundled | Apache License 2.0 |

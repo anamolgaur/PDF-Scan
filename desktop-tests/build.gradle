@@ -31,6 +31,8 @@ sourceSets {
             include 'com/anamol/pdfscan/GothicNocturnes.java'
             include 'com/anamol/pdfscan/BarcodeCore.java'
             include 'com/anamol/pdfscan/PdfOverlay.java'
+            include 'com/anamol/pdfscan/PageNet.java'
+            include 'com/anamol/pdfscan/PageFind.java'
         }
         resources.srcDirs = []
     }

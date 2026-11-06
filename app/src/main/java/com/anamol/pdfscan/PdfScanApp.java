@@ -13,6 +13,7 @@ public class PdfScanApp extends Application {
         super.onCreate();
         Diag.init(this);
         Ui.applyTheme(Prefs.amoled(this));
+        PageModel.init(this);
         new Thread(() -> {
             DocStore store = new DocStore(this);
             store.purgeTrash();                    // recycle bin: older than 30 days

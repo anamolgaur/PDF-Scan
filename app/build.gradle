@@ -25,8 +25,8 @@ android {
         applicationId 'com.anamol.pdfscan'
         minSdk 29
         targetSdk 34
-        versionCode 15
-        versionName '7.2'
+        versionCode 17
+        versionName '7.4'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         buildConfigField 'String', 'DRIVE_CLIENT_ID', "\"${driveClientId}\""
         buildConfigField 'String', 'DRIVE_CLIENT_SECRET', "\"${driveClientSecret}\""

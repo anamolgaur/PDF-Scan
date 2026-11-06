@@ -27,6 +27,15 @@ used only if you choose to link Google Drive.
 - Adjust › Book page: a Curve slider (with which side the spine is on) flattens text lines
   that bend near the binding.
 
+**Smart page finding**
+- A small neural network finds the page's four corners on the phone itself: on cluttered or
+  white desks, with hands or shadows in the frame, or with a corner just outside the picture.
+- It is DocAligner's lightweight model (Apache 2.0), run by the app's own code, so no AI library
+  is bundled (adds about 2 MB) and nothing is downloaded or sent anywhere.
+- Backup: whenever the network isn't sure, or "Smart page finding" is off in Settings, the
+  classic detector (brightness and outline) is used instead.
+- Either way, the corners are then snapped onto the page's real edges for a tight crop.
+
 **Edit an existing PDF**
 - Open a PDF (from "On this phone", or "Open with PDF Scan" from another app) and tap the pen
   icon. Its pages open in the same editor as scans: crop, filters, brightness and contrast,

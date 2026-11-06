@@ -81,6 +81,15 @@ final class Prefs {
         get(c).edit().putBoolean("theme_amoled", on).apply();
     }
 
+    /** Find pages with the on-device neural network (the classic detector is always the backup). */
+    static boolean smartDetect(Context c) {
+        return get(c).getBoolean("smart_detect", true);
+    }
+
+    static void setSmartDetect(Context c, boolean on) {
+        get(c).edit().putBoolean("smart_detect", on).apply();
+    }
+
     /** Remove pages' original photos after this many days to save space (0 = keep them). */
     static int keepOriginalsDays(Context c) {
         return get(c).getInt("keep_originals_days", 0);

@@ -1,14 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432">
-  <rect width="108" height="108" fill="#4A1521"/>
-  <!-- viewfinder brackets -->
-  <g fill="none" stroke="#F4EBDD" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M30 39 V31 H38"/>
-    <path d="M70 31 H78 V39"/>
-    <path d="M78 69 V77 H70"/>
-    <path d="M38 77 H30 V69"/>
-  </g>
-  <!-- page with folded corner; text lines are cut out so the ground shows through -->
-  <path fill="#F4EBDD" fill-rule="evenodd" d="M43 38 H60 L67 45 V68 A2 2 0 0 1 65 70 H43 A2 2 0 0 1 41 68 V40 A2 2 0 0 1 43 38 Z
-     M45.5 48 h17 v2.6 h-17 Z M45.5 53.5 h17 v2.6 h-17 Z M45.5 59 h17 v2.6 h-17 Z M45.5 64.5 h10 v2.6 h-10 Z"/>
-  <path fill="#D9C3AE" d="M60 38 V45 H67 Z"/>
+  <rect width="108" height="108" fill="#000000"/>
+  <!-- viewfinder brackets, inside the 66-unit safe circle -->
+  <path d="M36 42.5 V36 H42.5 M65.5 36 H72 V42.5 M72 65.5 V72 H65.5 M42.5 72 H36 V65.5" fill="none"
+        stroke="#9E2F45" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- page with folded corner; text lines are cut out so the black shows through -->
+  <path fill="#9E2F45" fill-rule="evenodd" d="M45.5 42 H58.5 L64 47.5 V64.5 A1.6 1.6 0 0 1 62.4 66 H45.5 A1.6 1.6 0 0 1 44 64.5 V43.5 A1.6 1.6 0 0 1 45.5 42 Z
+     M47.5 50 h12.5 v2.1 h-12.5 Z M47.5 54.3 h12.5 v2.1 h-12.5 Z M47.5 58.6 h12.5 v2.1 h-12.5 Z M47.5 62.9 h7.5 v2.1 h-7.5 Z"/>
+  <path fill="#C9586D" d="M58.5 42 V47.5 H64 Z"/>
 </svg>

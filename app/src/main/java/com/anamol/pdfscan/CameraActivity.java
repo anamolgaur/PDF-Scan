@@ -486,6 +486,7 @@ public class CameraActivity extends Activity {
     @Override
     protected void onDestroy() {
         saver.shutdown();
+        netThread.shutdown();
         super.onDestroy();
     }
 
@@ -823,9 +824,41 @@ public class CameraActivity extends Activity {
         float cell = (sw / 16f) * (sh / 12f);
         for (int i = 0; i < thumb.length; i++) thumb[i] /= cell;
         float[] c = ScanMath.detectPage(px, sw, sh);
+        if (c == null) c = networkAssist(px, sw, sh);
         for (int r = 0; c != null && r < sensorOrientation / 90; r++) c = ScanMath.rotateCornersCw(c);
         final float[] corners = c;
         runOnUiThread(() -> onAnalysis(corners, thumb));
+    }
+
+    // The neural network is slower than the classic detector, so in the live view it runs on its
+    // own thread a few times a second and helps when the classic detector finds nothing.
+    private final java.util.concurrent.ExecutorService netThread =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private volatile boolean netBusy;
+    private volatile float[] netCorners;
+    private volatile long netAt;
+    private long netStarted;
+
+    private float[] networkAssist(final int[] px, final int sw, final int sh) {
+        if (mode != Prefs.CAMERA_SCAN && mode != Prefs.CAMERA_ID) return null;
+        long now = SystemClock.uptimeMillis();
+        if (!netBusy && now - netStarted > 350) {
+            final PageNet net = PageModel.get();
+            if (net != null) {
+                netBusy = true;
+                netStarted = now;
+                netThread.execute(() -> {
+                    try {
+                        netCorners = PageFind.byNetwork(net, px, sw, sh, 0.6f);
+                        netAt = SystemClock.uptimeMillis();
+                    } finally {
+                        netBusy = false;
+                    }
+                });
+            }
+        }
+        float[] c = netCorners;
+        return c != null && now - netAt < 900 ? c.clone() : null;
     }
 
     private static float maxDelta(float[] a, float[] b) {
@@ -1043,10 +1076,16 @@ public class CameraActivity extends Activity {
                 PageMeta m = new PageMeta();
                 if (straighten) {
                     m.filter = filter;
-                    Bitmap small = ImageProcessor.decodeFile(original, 900);
-                    m.corners = ImageProcessor.detectCorners(small);
+                    Bitmap small = ImageProcessor.decodeFile(original, 1400);
+                    float[] found = ImageProcessor.detectCorners(small);
+                    // without the network, the photo's own guess may take in part of the desk:
+                    // the live view only accepted a real sheet of paper, so trust that outline
+                    boolean smart = PageModel.get() != null;
+                    if (hint != null && (found == null || (!smart && maxDelta(found, hint) > 0.06f))) {
+                        found = ImageProcessor.refineCorners(small, hint);
+                    }
                     small.recycle();
-                    if (m.corners == null) m.corners = hint;
+                    m.corners = found;
                 } else {
                     m.filter = ImageOps.ORIGINAL;  // a normal photo; crop and filters come later
                 }

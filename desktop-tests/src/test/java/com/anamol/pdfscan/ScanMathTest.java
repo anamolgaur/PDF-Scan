@@ -241,4 +241,50 @@ public class ScanMathTest {
             assertTrue("column " + x + " line at " + darkest, Math.abs(darkest - 100) <= 1);
         }
     }
+
+    private static void assertNear(float[] c, float tol, String what) {
+        for (int i = 0; i < 4; i++) {
+            float ex = XS[i] / (float) (W - 1), ey = YS[i] / (float) (H - 1);
+            assertTrue(what + " corner " + i + " x " + c[2 * i] + " vs " + ex, Math.abs(c[2 * i] - ex) < tol);
+            assertTrue(what + " corner " + i + " y " + c[2 * i + 1] + " vs " + ey, Math.abs(c[2 * i + 1] - ey) < tol);
+        }
+    }
+
+    @Test
+    public void refinementSnapsCornersOntoTheEdges() {
+        int[] full = photo.getRGB(0, 0, W, H, null, 0, W);
+        float[] rough = ScanMath.detectCorners(preview(240, 320), 240, 320);
+        float[] fine = ScanMath.refineCorners(full, W, H, rough);
+        assertNear(fine, 0.005f, "refined");  // within ~6 px of 1200
+    }
+
+    @Test
+    public void refinementRecoversFromAPoorGuess() {
+        int[] full = photo.getRGB(0, 0, W, H, null, 0, W);
+        float[] off = new float[8];
+        float[] push = {0.025f, -0.02f, -0.02f, 0.025f, -0.025f, -0.02f, 0.02f, -0.025f};
+        for (int i = 0; i < 4; i++) {
+            off[2 * i] = XS[i] / (float) (W - 1) + push[2 * i];
+            off[2 * i + 1] = YS[i] / (float) (H - 1) + push[2 * i + 1];
+        }
+        assertNear(ScanMath.refineCorners(full, W, H, off), 0.006f, "from a poor guess");
+    }
+
+    @Test
+    public void refinementFindsAWhitePageOnAWhiteDesk() {
+        int[] small = whiteOnWhite(240, 320);
+        float[] rough = ScanMath.detectPage(small, 240, 320);
+        assertNotNull(rough);
+        float[] fine = ScanMath.refineCorners(small, 240, 320, rough);
+        float[] expect = {40 / 239f, 45 / 319f, 200 / 239f, 55 / 319f, 205 / 239f, 280 / 319f, 35 / 239f, 270 / 319f};
+        for (int i = 0; i < 8; i++) assertTrue("corner value " + i + " = " + fine[i], Math.abs(fine[i] - expect[i]) < 0.02f);
+    }
+
+    @Test
+    public void refinementKeepsTheGuessWhenThereIsNoEdge() {
+        int[] flat = new int[400 * 400];
+        Arrays.fill(flat, 0xFF808080);
+        float[] guess = {0.1f, 0.1f, 0.9f, 0.1f, 0.9f, 0.9f, 0.1f, 0.9f};
+        assertArrayEquals(guess, ScanMath.refineCorners(flat, 400, 400, guess), 0f);
+    }
 }

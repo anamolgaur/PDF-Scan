@@ -62,6 +62,10 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
                 i -> Prefs.setDefaultFilter(this, ImageOps.FILTERS[i]));
         root.addView(toggle("Capture automatically when a page is steady", Prefs.autoCapture(this),
                 (b, on) -> Prefs.setAutoCapture(this, on)), Ui.full(this, 8));
+        root.addView(Ui.toggleWith(this, "Smart page finding",
+                "A small AI model on the phone finds the page's corners, even on cluttered or white desks. "
+                        + "Nothing is sent anywhere. When it's unsure, or this is off, the classic detector is used.",
+                Prefs.smartDetect(this), (b, on) -> Prefs.setSmartDetect(this, on)), Ui.full(this, 8));
 
         root.addView(Ui.section(this, "Text"));
         root.addView(toggle("Recognise text in the background", Indexer.autoEnabled(this),
