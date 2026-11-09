@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
  * It looks at a 256 x 256 copy of the photo and returns, for each corner, a heatmap of where that
  * corner probably is; the peak gives the position and its height the confidence.
  */
-final class PageNet {
+final class PageNet implements PageFind.Detector {
     static final int SIZE = 256;
 
     private static final int CONV = 1, RELU = 2, SIGMOID = 3, MAXPOOL = 4, RESIZE = 5, MEAN = 6,
@@ -428,7 +428,8 @@ final class PageNet {
     }
 
     /** Finds the four corners. Works best with a picture about 500-1000 px on the long side. */
-    Corners find(int[] px, int w, int h) {
+    @Override
+    public Corners find(int[] px, int w, int h) {
         int[] s = new int[3];
         float[] heat = run(input(px, w, h), s);
         int C = s[0], H = s[1], W = s[2];

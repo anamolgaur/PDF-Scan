@@ -2,33 +2,59 @@ package com.anamol.pdfscan;
 
 /**
  * Finding the page in a photo, in two layers:
- *  1. the on-device neural network (PageNet), which copes with cluttered desks, white-on-white,
- *     hands, shadows and pages partly out of the frame;
+ *  1. the on-device neural network (DocNet, or PageNet if ONNX Runtime can't start), which copes
+ *     with cluttered desks, white-on-white, hands, shadows and pages partly out of the frame;
  *  2. as a backup, the classic detector (ScanMath), used whenever the network is unsure or
  *     switched off.
  * Either way the corners are then snapped onto the page's real edges (ScanMath.refineCorners).
  * Pure Java, so it's tested on the desktop.
  */
 final class PageFind {
+    /** A neural page finder: DocNet (main) or PageNet (smaller, plain-Java). */
+    interface Detector {
+        PageNet.Corners find(int[] px, int w, int h);
+    }
+
     /** The network must be at least this sure of every corner. */
     static final float MIN_CONFIDENCE = 0.5f;
+    /** How far edge snapping may move an AI-found side (fraction of the long side). */
+    static final float AI_REACH = 0.012f;
 
     private PageFind() {
     }
 
-    /** Corners for a finished photo (about 1000-1400 px on the long side), or null if no page. */
-    static float[] corners(PageNet net, int[] px, int w, int h) {
-        float[] c = byNetwork(net, px, w, h, MIN_CONFIDENCE);
-        if (c == null) {
-            int[] wh = new int[2];
-            int[] small = shrink(px, w, h, 320, wh);
-            c = ScanMath.detectCorners(small, wh[0], wh[1]);
+    /**
+     * Corners for a finished photo (about 1000-1400 px on the long side), or null if no page.
+     * The AI's answer is used when it is sure. When it isn't, both its answer and the classic
+     * detector's are snapped to the edges and the one whose sides follow real edges more clearly
+     * wins (the AI is often right even when unsure; the classic detector sometimes grabs the desk).
+     */
+    static float[] corners(Detector net, int[] px, int w, int h) {
+        float[] ai = null;
+        float conf = 0;
+        if (net != null) {
+            try {
+                PageNet.Corners r = net.find(px, w, h);
+                if (plausible(r.corners)) {
+                    ai = ScanMath.refineCorners(px, w, h, r.corners, AI_REACH);
+                    conf = r.minConfidence();
+                }
+            } catch (RuntimeException | OutOfMemoryError e) {
+                ai = null;
+            }
         }
-        return c == null ? null : ScanMath.refineCorners(px, w, h, c);
+        if (ai != null && conf >= MIN_CONFIDENCE) return ai;
+        int[] wh = new int[2];
+        int[] small = shrink(px, w, h, 320, wh);
+        float[] classic = ScanMath.detectCorners(small, wh[0], wh[1]);
+        if (classic != null) classic = ScanMath.refineCorners(px, w, h, classic);
+        if (ai == null) return classic;
+        if (classic == null) return ai;
+        return ScanMath.edgeScore(px, w, h, ai) >= ScanMath.edgeScore(px, w, h, classic) ? ai : classic;
     }
 
     /** The network's corners when it is sure and they make a sensible page shape; else null. */
-    static float[] byNetwork(PageNet net, int[] px, int w, int h, float minConfidence) {
+    static float[] byNetwork(Detector net, int[] px, int w, int h, float minConfidence) {
         if (net == null) return null;
         try {
             PageNet.Corners r = net.find(px, w, h);

@@ -647,32 +647,58 @@ final class ScanMath {
     // ------------------------------------------------------------------ corner refinement
 
     /**
-     * Snaps rough corners (found on a small picture) onto the page's real edges in a larger
-     * picture. Each side is searched across its width at many points for the strongest
-     * page-to-background step, a straight line is fitted through those points (ignoring stray
-     * ones: text, shadows, fingers), and the corners become where neighbouring lines cross.
-     * Works even when a corner itself is covered or slightly outside the frame. Returns the
-     * rough corners unchanged if the edges can't be found reliably.
+     * Snaps rough corners onto the page's real edges. Each side is searched across its width at
+     * many points. A point counts as the page's edge only when:
+     *  - colour or brightness changes clearly there (colour too, so white paper on a cream or
+     *    grey desk still has an edge),
+     *  - the change goes the same way as between the page and its surroundings (a text line has
+     *    page on both sides, a shadow is darker than the desk beyond it),
+     *  - the inside of the step looks like the page and the outside doesn't.
+     * Of the edges that pass, the outermost strong one is used, so lines of text or a table
+     * border near the page's edge aren't mistaken for it. A straight line is fitted through the
+     * points (ignoring strays: fingers, dog-ears), and the corners are where neighbouring lines
+     * cross, so a covered or out-of-frame corner still lands right. The crop is then pulled in by
+     * half the edge's own softness: nothing for a crisp edge, a little for a soft shadowy one.
+     * Returns the rough corners unchanged if the edges can't be found reliably.
      */
     static float[] refineCorners(int[] px, int w, int h, float[] rough) {
+        return refineCorners(px, w, h, rough, 0.035f);
+    }
+
+    /**
+     * reach: how far (fraction of the picture's long side) a side may move. Small when the
+     * rough corners are already good (the AI finder is within about 1%), so snapping only
+     * fine-tunes and can't wander off to a nearby line.
+     */
+    static float[] refineCorners(int[] px, int w, int h, float[] rough, float reach) {
         if (rough == null || w < 32 || h < 32) return rough;
-        float[] g = new float[w * h];
-        for (int i = 0; i < g.length; i++) g[i] = luma(px[i]);
+        int n = w * h;
+        float[][] rgb = new float[3][n];
+        for (int i = 0; i < n; i++) {
+            int c = px[i];
+            rgb[0][i] = (c >> 16) & 0xFF;
+            rgb[1][i] = (c >> 8) & 0xFF;
+            rgb[2][i] = c & 0xFF;
+        }
         float[] c = rough.clone();
         int big = Math.max(w, h);
-        float[] bands = {Math.max(6f, big * 0.035f), Math.max(3f, big * 0.008f)};
+        float[] bands = reach > 0.015f
+                ? new float[]{Math.max(6f, big * reach), Math.max(3f, big * 0.01f)}
+                : new float[]{Math.max(3f, big * reach)};
         boolean moved = false;
+        float softness = 0;
         for (float band : bands) {
-            float[] next = refineOnce(g, w, h, c, band);
+            float[] soft = new float[1];
+            float[] next = refineOnce(rgb, w, h, c, band, soft);
             if (next == null) break;
             c = next;
+            softness = soft[0];
             moved = true;
         }
         if (!moved) return rough;
-        // a hair inside the edge, so no sliver of desk shows along the border
-        c = inset(c, w, h, Math.max(1f, big * 0.0015f));
+        c = inset(c, w, h, Math.max(0.5f, Math.min(big * 0.006f, softness * 0.5f)));
         float a0 = quadArea(rough), a1 = quadArea(c);
-        if (a1 < a0 * 0.8f || a1 > a0 * 1.25f || !convex(c)) return rough;
+        if (a1 < a0 * 0.75f || a1 > a0 * 1.3f || !convex(c)) return rough;
         for (int i = 0; i < 8; i++) c[i] = Math.max(0f, Math.min(1f, c[i]));
         return c;
     }
@@ -687,8 +713,12 @@ final class ScanMath {
         return a * (1 - fy) + b * fy;
     }
 
+    private static float lum(float r, float g, float b) {
+        return 0.299f * r + 0.587f * g + 0.114f * b;
+    }
+
     /** One pass: returns new normalised corners, or null when too few edges were found. */
-    private static float[] refineOnce(float[] g, int w, int h, float[] c, float band) {
+    private static float[] refineOnce(float[][] rgb, int w, int h, float[] c, float band, float[] softOut) {
         float fw = w - 1f, fh = h - 1f;
         float[] X = new float[4], Y = new float[4];
         for (int i = 0; i < 4; i++) {
@@ -696,80 +726,139 @@ final class ScanMath {
             Y[i] = c[i * 2 + 1] * fh;
         }
         float cx = (X[0] + X[1] + X[2] + X[3]) / 4f, cy = (Y[0] + Y[1] + Y[2] + Y[3]) / 4f;
-        float[][] lines = new float[4][];  // {px, py, dx, dy}: a point and a unit direction
+        float[][] lines = new float[4][];
         int fitted = 0;
         final int N = 48;
-        int steps = Math.max(8, Math.round(band * 2));
+        final float stepPx = Math.max(0.5f, band / 40f);       // sampling step across the edge
+        final int steps = Math.round(band / stepPx);
+        final int win = Math.max(2, Math.round(Math.max(2f, Math.max(w, h) * 0.004f) / stepPx));  // window each side
+        final int len = steps * 2 + 1;
+        List<Float> softness = new ArrayList<>();
         for (int s = 0; s < 4; s++) {
             float x0 = X[s], y0 = Y[s], x1 = X[(s + 1) % 4], y1 = Y[(s + 1) % 4];
-            float len = (float) Math.hypot(x1 - x0, y1 - y0);
-            if (len < 8) return null;
-            float tx = (x1 - x0) / len, ty = (y1 - y0) / len;
+            float sideLen = (float) Math.hypot(x1 - x0, y1 - y0);
+            if (sideLen < 8) return null;
+            float tx = (x1 - x0) / sideLen, ty = (y1 - y0) / sideLen;
             float nx = -ty, ny = tx;
             float mx = (x0 + x1) / 2f, my = (y0 + y1) / 2f;
             if ((mx - cx) * nx + (my - cy) * ny < 0) {
                 nx = -nx;
                 ny = -ny;
             }  // n points out of the page
-            float[][] prof = new float[N][];
-            float inSum = 0, outSum = 0;
+            // colour profiles across the edge at N places along the side
+            float[][][] prof = new float[N][][];
+            float[] pageRef = new float[3];
+            float[] outRef = new float[3];
+            int refN = 0, outN = 0;
             for (int k = 0; k < N; k++) {
                 float t = 0.08f + 0.84f * k / (N - 1f);
                 float bx = x0 + (x1 - x0) * t, by = y0 + (y1 - y0) * t;
-                float[] v = new float[steps * 2 + 1];
-                boolean ok = true;
-                for (int j = -steps; j <= steps; j++) {
-                    float d = band * j / steps;
-                    float acc = 0;
-                    int cnt = 0;
-                    for (int q = -1; q <= 1; q++) {  // a little along the edge, against noise
-                        float val = sample(g, w, h, bx + d * nx + q * 1.5f * tx, by + d * ny + q * 1.5f * ty);
-                        if (!Float.isNaN(val)) {
-                            acc += val;
-                            cnt++;
+                float[][] v = new float[3][len];
+                boolean inside = true;
+                for (int j = 0; j < len; j++) {
+                    float d = (j - steps) * stepPx;
+                    for (int ch = 0; ch < 3; ch++) {
+                        float acc = 0;
+                        int cnt = 0;
+                        for (int q = -1; q <= 1; q++) {  // a little along the edge, against noise
+                            float val = sample(rgb[ch], w, h, bx + d * nx + q * 1.5f * tx, by + d * ny + q * 1.5f * ty);
+                            if (!Float.isNaN(val)) {
+                                acc += val;
+                                cnt++;
+                            }
                         }
+                        v[ch][j] = cnt == 0 ? Float.NaN : acc / cnt;
                     }
-                    if (cnt == 0) {
-                        v[j + steps] = Float.NaN;
-                        ok = j > 0;  // running off the frame outside the page is fine
-                    } else {
-                        v[j + steps] = acc / cnt;
-                    }
+                    if (Float.isNaN(v[0][j]) && j <= steps) inside = false;
                 }
-                if (!ok) continue;
+                if (!inside) continue;  // the page side ran off the picture
                 prof[k] = v;
-                for (int j = 0; j < steps; j++) if (!Float.isNaN(v[j])) inSum += v[j];
-                for (int j = steps + 1; j < v.length; j++) if (!Float.isNaN(v[j])) outSum += v[j];
+                for (int j = 0; j < Math.max(1, steps / 3); j++) {
+                    for (int ch = 0; ch < 3; ch++) pageRef[ch] += v[ch][j];
+                    refN++;
+                }
+                for (int j = len - Math.max(1, steps / 3); j < len; j++) {
+                    if (Float.isNaN(v[0][j])) continue;
+                    for (int ch = 0; ch < 3; ch++) outRef[ch] += v[ch][j];
+                    outN++;
+                }
             }
-            float sign = inSum >= outSum ? 1f : -1f;  // page lighter than what is around it?
+            if (refN == 0) return null;
+            for (int ch = 0; ch < 3; ch++) {
+                pageRef[ch] /= refN;
+                outRef[ch] = outN > 0 ? outRef[ch] / outN : pageRef[ch];
+            }
+            float lumDir = lum(pageRef[0], pageRef[1], pageRef[2]) - lum(outRef[0], outRef[1], outRef[2]);
+            boolean useSign = Math.abs(lumDir) > 12f;   // a clear brightness difference to rely on
+            float sign = Math.signum(lumDir);
+
             List<float[]> pts = new ArrayList<>();
             for (int k = 0; k < N; k++) {
-                float[] v = prof[k];
+                float[][] v = prof[k];
                 if (v == null) continue;
                 float t = 0.08f + 0.84f * k / (N - 1f);
                 float bx = x0 + (x1 - x0) * t, by = y0 + (y1 - y0) * t;
+                float[] score = new float[len];
                 float best = 0;
-                int bestJ = Integer.MIN_VALUE;
-                for (int j = 1; j < v.length - 1; j++) {
-                    if (Float.isNaN(v[j - 1]) || Float.isNaN(v[j + 1])) continue;
-                    float step = sign * (v[j - 1] - v[j + 1]);
-                    float d = Math.abs(j - steps) / (float) steps;
-                    float score = step * (1f - 0.25f * d);  // prefer edges near the guess
-                    if (score > best) {
-                        best = score;
-                        bestJ = j;
+                for (int j = win; j < len - win; j++) {
+                    float[] in = new float[3], out = new float[3];
+                    boolean ok = true;
+                    for (int ch = 0; ch < 3 && ok; ch++) {
+                        for (int q = 1; q <= win; q++) {
+                            float a = v[ch][j - q], b = v[ch][j + q];
+                            if (Float.isNaN(a) || Float.isNaN(b)) {
+                                ok = false;
+                                break;
+                            }
+                            in[ch] += a;
+                            out[ch] += b;
+                        }
+                        in[ch] /= win;
+                        out[ch] /= win;
+                    }
+                    if (!ok) continue;
+                    float dl = lum(in[0], in[1], in[2]) - lum(out[0], out[1], out[2]);
+                    if (useSign && dl * sign <= 0) continue;
+                    double dIn = 0, dOut = 0, step = 0;
+                    for (int ch = 0; ch < 3; ch++) {
+                        step += (in[ch] - out[ch]) * (in[ch] - out[ch]);
+                        dIn += (in[ch] - pageRef[ch]) * (in[ch] - pageRef[ch]);
+                        dOut += (out[ch] - pageRef[ch]) * (out[ch] - pageRef[ch]);
+                    }
+                    if (dIn >= dOut) continue;  // the inside must look more like the page
+                    float sc = (float) Math.sqrt(step);
+                    score[j] = sc;
+                    best = Math.max(best, sc);
+                }
+                if (best < 10f) continue;
+                // outermost strong local peak
+                int pick = -1;
+                for (int j = len - win - 1; j >= win; j--) {
+                    if (score[j] >= best * 0.55f && score[j] >= score[j - 1] && score[j] >= score[j + 1]) {
+                        pick = j;
+                        break;
                     }
                 }
-                float perPx = best / (2f * band / steps);
-                if (bestJ == Integer.MIN_VALUE || perPx < 3f) continue;
-                float d = band * (bestJ - steps) / steps;
+                if (pick < 0) continue;
+                float off = 0;
+                float l = score[pick - 1], m = score[pick], r = score[pick + 1];
+                float den = l - 2 * m + r;
+                if (den < 0) off = Math.max(-0.5f, Math.min(0.5f, 0.5f * (l - r) / den));
+                float d = (pick - steps + off) * stepPx;
                 pts.add(new float[]{bx + d * nx, by + d * ny});
+                // softness: how wide the change is (step / steepest slope)
+                float steep = 0;
+                for (int j = Math.max(1, pick - win); j <= Math.min(len - 2, pick + win); j++) {
+                    float a = lum(v[0][j - 1], v[1][j - 1], v[2][j - 1]), b = lum(v[0][j + 1], v[1][j + 1], v[2][j + 1]);
+                    if (!Float.isNaN(a) && !Float.isNaN(b)) steep = Math.max(steep, Math.abs(a - b) / (2 * stepPx));
+                }
+                if (steep > 0) softness.add(Math.min(band, m / steep));
             }
             float[] line = fitLine(pts, N);
             if (line != null) {
                 float dot = Math.abs(line[2] * tx + line[3] * ty);
-                float off = Math.abs((line[0] - mx) * nx + (line[1] - my) * ny);
-                if (dot < 0.985f || off > band) line = null;  // turned more than ~10 degrees, or wandered
+                float offc = Math.abs((line[0] - mx) * nx + (line[1] - my) * ny);
+                if (dot < 0.985f || offc > band) line = null;  // turned more than ~10 degrees, or wandered
             }
             if (line == null) {
                 line = new float[]{x0, y0, tx, ty};
@@ -779,6 +868,10 @@ final class ScanMath {
             lines[s] = line;
         }
         if (fitted < 2) return null;
+        if (!softness.isEmpty()) {
+            java.util.Collections.sort(softness);
+            softOut[0] = softness.get(softness.size() / 2);
+        }
         float[] out = new float[8];
         for (int i = 0; i < 4; i++) {
             float[] a = lines[(i + 3) % 4], b = lines[i];
@@ -857,5 +950,57 @@ final class ScanMath {
             else if (Math.signum(z) != sign) return false;
         }
         return true;
+    }
+
+    /**
+     * How clearly a quad's four sides follow real edges: the typical colour difference between
+     * just inside and just outside each side, taking the weakest side. A real page scores high;
+     * an outline that cuts across the desk, or around a shadow, scores low on some side.
+     */
+    static float edgeScore(int[] px, int w, int h, float[] c) {
+        if (c == null) return 0f;
+        float fw = w - 1f, fh = h - 1f;
+        float cx = 0, cy = 0;
+        for (int i = 0; i < 4; i++) {
+            cx += c[i * 2] * fw / 4f;
+            cy += c[i * 2 + 1] * fh / 4f;
+        }
+        float gap = Math.max(1.5f, Math.max(w, h) * 0.004f), reach = Math.max(4f, Math.max(w, h) * 0.012f);
+        float weakest = Float.MAX_VALUE;
+        final int N = 32;
+        for (int s = 0; s < 4; s++) {
+            float x0 = c[s * 2] * fw, y0 = c[s * 2 + 1] * fh;
+            float x1 = c[((s + 1) % 4) * 2] * fw, y1 = c[((s + 1) % 4) * 2 + 1] * fh;
+            float len = (float) Math.hypot(x1 - x0, y1 - y0);
+            if (len < 4) return 0f;
+            float nx = -(y1 - y0) / len, ny = (x1 - x0) / len;
+            if (((x0 + x1) / 2 - cx) * nx + ((y0 + y1) / 2 - cy) * ny < 0) {
+                nx = -nx;
+                ny = -ny;
+            }
+            float[] d = new float[N];
+            int n = 0;
+            for (int k = 0; k < N; k++) {
+                float t = 0.1f + 0.8f * k / (N - 1f);
+                float bx = x0 + (x1 - x0) * t, by = y0 + (y1 - y0) * t;
+                int ix = Math.round(bx - nx * (gap + reach / 2)), iy = Math.round(by - ny * (gap + reach / 2));
+                int ox = Math.round(bx + nx * (gap + reach / 2)), oy = Math.round(by + ny * (gap + reach / 2));
+                if (ix < 0 || iy < 0 || ix >= w || iy >= h) continue;
+                if (ox < 0 || oy < 0 || ox >= w || oy >= h) {
+                    d[n++] = 40f;  // the page runs to the picture's edge here: neutral
+                    continue;
+                }
+                int a = px[iy * w + ix], b = px[oy * w + ox];
+                float dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+                float dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+                float db = (a & 0xFF) - (b & 0xFF);
+                d[n++] = (float) Math.sqrt(dr * dr + dg * dg + db * db);
+            }
+            if (n < N / 3) return 0f;
+            float[] dd = java.util.Arrays.copyOf(d, n);
+            java.util.Arrays.sort(dd);
+            weakest = Math.min(weakest, dd[n / 2]);
+        }
+        return weakest;
     }
 }

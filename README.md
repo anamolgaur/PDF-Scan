@@ -28,13 +28,18 @@ used only if you choose to link Google Drive.
   that bend near the binding.
 
 **Smart page finding**
-- A small neural network finds the page's four corners on the phone itself: on cluttered or
-  white desks, with hands or shadows in the frame, or with a corner just outside the picture.
-- It is DocAligner's lightweight model (Apache 2.0), run by the app's own code, so no AI library
-  is bundled (adds about 2 MB) and nothing is downloaded or sent anywhere.
-- Backup: whenever the network isn't sure, or "Smart page finding" is off in Settings, the
-  classic detector (brightness and outline) is used instead.
-- Either way, the corners are then snapped onto the page's real edges for a tight crop.
+- An AI model on the phone finds the page's four corners: DocAligner's most accurate model
+  (FastViT-SA24, Apache 2.0), run with ONNX Runtime. Nothing is downloaded or sent anywhere.
+- The photo is shown to the model at its real shape (fitted and padded, not squashed), which
+  makes it far more reliable on tall phone photos.
+- It leads in the live camera too, running on its own thread several times a second.
+- Backup: when the AI is unsure, its answer and the classic detector's are compared, and the
+  one whose sides follow real edges wins. With "Smart page finding" off in Settings, only the
+  classic detector is used. If ONNX Runtime can't start, a smaller built-in model is used.
+- Edge snapping then fine-tunes each side onto the page's real edge, checking colour as well as
+  brightness, ignoring text lines and shadows, and trimming only as much as the edge is blurry.
+- On a set of 40 test photos, the corners land a median 5 px from the true corner (on 900 x
+  1200 photos); the classic detector alone was off by more than 20 px on 24 of them.
 
 **Edit an existing PDF**
 - Open a PDF (from "On this phone", or "Open with PDF Scan" from another app) and tap the pen

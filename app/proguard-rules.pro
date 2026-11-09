@@ -9,3 +9,6 @@
 
 # ZXing: format readers are created by name in some paths
 -keep class com.google.zxing.** { *; }
+
+# ONNX Runtime (page model) is called from native code
+-keep class ai.onnxruntime.** { *; }

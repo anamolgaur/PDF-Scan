@@ -69,7 +69,7 @@ public class CameraActivity extends Activity {
     static final int RESULT_USE_SYSTEM_CAMERA = RESULT_FIRST_USER;
     private static final String EXTRA_DIR = "dir";
     private static final int REQ_PERMISSION = 7;
-    private static final float STABLE_DELTA = 0.02f;
+    private static final float STABLE_DELTA = 0.03f;
     /** A page must hold still this long before auto-capture. */
     private static final long STEADY_MS = 1300;
     /** Minimum pause between automatic captures, so there is time to turn the page. */
@@ -823,15 +823,16 @@ public class CameraActivity extends Activity {
         }
         float cell = (sw / 16f) * (sh / 12f);
         for (int i = 0; i < thumb.length; i++) thumb[i] /= cell;
-        float[] c = ScanMath.detectPage(px, sw, sh);
-        if (c == null) c = networkAssist(px, sw, sh);
+        // the AI page finder leads; the classic detector fills in while it is busy or unsure
+        float[] c = networkAssist(px, sw, sh);
+        if (c == null) c = ScanMath.detectPage(px, sw, sh);
         for (int r = 0; c != null && r < sensorOrientation / 90; r++) c = ScanMath.rotateCornersCw(c);
         final float[] corners = c;
         runOnUiThread(() -> onAnalysis(corners, thumb));
     }
 
-    // The neural network is slower than the classic detector, so in the live view it runs on its
-    // own thread a few times a second and helps when the classic detector finds nothing.
+    // The AI page finder runs on its own thread, as often as it can keep up (several times a
+    // second on most phones); its latest answer is used while it is fresh.
     private final java.util.concurrent.ExecutorService netThread =
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private volatile boolean netBusy;
@@ -842,14 +843,17 @@ public class CameraActivity extends Activity {
     private float[] networkAssist(final int[] px, final int sw, final int sh) {
         if (mode != Prefs.CAMERA_SCAN && mode != Prefs.CAMERA_ID) return null;
         long now = SystemClock.uptimeMillis();
-        if (!netBusy && now - netStarted > 350) {
-            final PageNet net = PageModel.get();
+        if (!netBusy && now - netStarted > 120) {
+            final PageFind.Detector net = PageModel.get();
             if (net != null) {
                 netBusy = true;
                 netStarted = now;
                 netThread.execute(() -> {
                     try {
-                        netCorners = PageFind.byNetwork(net, px, sw, sh, 0.6f);
+                        float[] found = PageFind.byNetwork(net, px, sw, sh, 0.3f);
+                        // the AI's confidence is cautious; also check the outline follows real edges
+                        if (found != null && found[0] >= 0 && ScanMath.edgeScore(px, sw, sh, found) < 12f) found = null;
+                        netCorners = found;
                         netAt = SystemClock.uptimeMillis();
                     } finally {
                         netBusy = false;
@@ -858,7 +862,7 @@ public class CameraActivity extends Activity {
             }
         }
         float[] c = netCorners;
-        return c != null && now - netAt < 900 ? c.clone() : null;
+        return c != null && now - netAt < 700 ? c.clone() : null;
     }
 
     private static float maxDelta(float[] a, float[] b) {
@@ -885,7 +889,8 @@ public class CameraActivity extends Activity {
         long now = SystemClock.uptimeMillis();
         lastThumb = thumb;
         if (c != null) {
-            if (maxDelta(c, lastRaw) < STABLE_DELTA) {
+            // steady = close to the smoothed outline (raw detections jitter even in a still hand)
+            if (maxDelta(c, smoothed != null ? smoothed : lastRaw) < STABLE_DELTA) {
                 if (steadySince == 0) steadySince = now;
             } else {
                 steadySince = 0;
@@ -899,7 +904,7 @@ public class CameraActivity extends Activity {
             }
         } else {
             lost++;
-            steadySince = 0;
+            if (lost > 2) steadySince = 0;  // a missed frame or two doesn't restart the countdown
             if (lost > 3) {
                 smoothed = null;
                 lastRaw = null;
@@ -934,7 +939,7 @@ public class CameraActivity extends Activity {
             status.setText("Page found. Tap the shutter.");
         }
 
-        if (autoOn && armed && !capturing && c != null && smoothed != null && steadySince != 0
+        if (autoOn && armed && !capturing && smoothed != null && lost <= 2 && steadySince != 0
                 && now - steadySince >= STEADY_MS && wait <= 0) {
             takePicture();
         }
