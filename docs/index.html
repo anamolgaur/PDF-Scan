@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Scan · offline document scanner for Android</title>
+<meta name="description" content="A private, offline document scanner and PDF editor for Android. On-device AI page finding, text recognition in 100+ languages, signatures and mark-up. No ads, no tracking, no account.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<meta property="og:title" content="PDF Scan">
+<meta property="og:description" content="Offline document scanner and PDF editor for Android. No ads, no tracking, no account.">
+<style>
+  /* Fonts are served from this site, so no font service ever sees a visitor. */
+  @font-face { font-family: "DM Sans"; src: url(assets/fonts/dm_sans_regular.ttf) format("truetype"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "DM Sans"; src: url(assets/fonts/dm_sans_medium.ttf) format("truetype"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Sora"; src: url(assets/fonts/sora_semibold.ttf) format("truetype"); font-weight: 600; font-display: swap; }
+
+  :root {
+    --maroon: #4A1521;
+    --maroon-2: #5E1B2A;
+    --maroon-line: #7A2E3E;
+    --cream: #F4EBDD;
+    --cream-muted: #D9C3AE;
+    --accent: #9E2F45;
+    --black: #000;
+    --bg: var(--maroon);
+    --ink: var(--cream);
+    --muted: var(--cream-muted);
+    --line: var(--maroon-line);
+    --surface: var(--maroon-2);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: "Sora", "DM Sans", sans-serif; font-weight: 600; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 12px; min-height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: "Sora", sans-serif; font-weight: 600; text-decoration: none; font-size: 18px; }
+  .brand img { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); }
+  nav .links { margin-left: auto; display: flex; gap: 6px; }
+  nav .links a { text-decoration: none; padding: 10px 12px; border-radius: 10px; min-height: 44px; display: inline-flex; align-items: center; font-size: 15px; color: var(--muted); }
+  nav .links a:hover { color: var(--ink); background: var(--surface); }
+  @media (max-width: 640px) { nav .links a.hide-sm { display: none; } }
+
+  /* buttons: flat, borders instead of shadows, at most two per section */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 12px 22px; border-radius: 12px; font: 500 16px "DM Sans", sans-serif; text-decoration: none; border: 1.5px solid var(--cream); white-space: nowrap; }
+  .btn.primary { background: var(--cream); color: var(--maroon); }
+  .btn.primary:hover { background: #fff; }
+  .btn.ghost { color: var(--cream); background: transparent; }
+  .btn.ghost:hover { background: var(--surface); }
+  .btn svg { width: 20px; height: 20px; flex: none; }
+
+  /* hero */
+  .hero { padding: 72px 0 56px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; }
+  .eyebrow { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; margin-bottom: 22px; }
+  .hero h1 { font-size: clamp(38px, 6vw, 64px); }
+  .hero h1 em { font-style: normal; color: var(--cream-muted); }
+  .hero p.lead { font-size: 19px; color: var(--muted); max-width: 34em; margin: 20px 0 30px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .fine { font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .hero-phones { position: relative; display: flex; justify-content: center; min-height: 520px; }
+  .hero-phones .phone:first-child { transform: translateX(40px) rotate(-4deg); }
+  .hero-phones .phone:last-child { position: absolute; transform: translateX(-120px) translateY(40px) rotate(5deg); z-index: -0; }
+  @media (max-width: 880px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .hero-phones { min-height: 0; }
+    .hero-phones .phone:last-child { display: none; }
+    .hero-phones .phone:first-child { transform: none; }
+  }
+
+  /* phone frame */
+  .phone { width: 260px; flex: none; border-radius: 34px; border: 2px solid var(--line); background: #000; padding: 9px; }
+  .phone svg { display: block; width: 100%; height: auto; border-radius: 26px; }
+  .shot-caption { font-size: 14px; color: var(--muted); text-align: center; margin-top: 12px; }
+
+  /* sections */
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(28px, 4vw, 40px); max-width: 20em; }
+  section p.sub { color: var(--muted); max-width: 40em; margin: 14px 0 0; }
+
+  /* promise strip */
+  .promise { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-top: 36px; }
+  .promise div { padding: 22px; border-right: 1px solid var(--line); }
+  .promise div:last-child { border-right: 0; }
+  .promise b { display: block; font-family: "Sora", sans-serif; font-weight: 600; font-size: 22px; }
+  .promise span { color: var(--muted); font-size: 15px; }
+  @media (max-width: 760px) { .promise { grid-template-columns: 1fr 1fr; } .promise div:nth-child(2) { border-right: 0; } .promise div:nth-child(-n+2) { border-bottom: 1px solid var(--line); } }
+
+  /* screens gallery */
+  .gallery { display: flex; gap: 22px; overflow-x: auto; padding: 36px 2px 18px; scroll-snap-type: x mandatory; }
+  .gallery figure { margin: 0; scroll-snap-align: start; }
+  .gallery .phone { width: 232px; }
+  .note { font-size: 13px; color: var(--muted); }
+
+  /* features */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; }
+  .feature { border: 1px solid var(--line); border-radius: 16px; padding: 24px; background: var(--surface); }
+  .feature svg { width: 28px; height: 28px; stroke: var(--cream); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .feature h3 { font-size: 19px; margin: 16px 0 8px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  @media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+
+  /* AI section */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 880px) { .split { grid-template-columns: 1fr; } }
+  .bars { margin-top: 28px; display: grid; gap: 14px; }
+  .bar { display: grid; grid-template-columns: 150px 1fr 70px; gap: 12px; align-items: center; font-size: 15px; }
+  .bar .track { height: 14px; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--cream); }
+  .bar .fill.dim { background: var(--cream-muted); opacity: .45; }
+  .bar b { font-weight: 500; text-align: right; }
+  @media (max-width: 520px) { .bar { grid-template-columns: 1fr 70px; } .bar .track { grid-column: 1 / -1; grid-row: 2; } }
+
+  /* download */
+  .download { background: #000; }
+  .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px; }
+  .dl { border: 1px solid var(--line); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 10px; }
+  .dl h3 { font-size: 21px; }
+  .dl p { margin: 0 0 8px; color: var(--muted); font-size: 15.5px; }
+  .dl .btn { align-self: flex-start; margin-top: auto; }
+  @media (max-width: 760px) { .dl-grid { grid-template-columns: 1fr; } }
+  .steps { margin: 36px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: s; }
+  .steps li { counter-increment: s; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font-size: 15.5px; }
+  .steps li::before { content: counter(s); display: block; font-family: "Sora", sans-serif; font-weight: 600; color: var(--cream); font-size: 22px; margin-bottom: 6px; }
+  .steps li b { color: var(--cream); font-weight: 500; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+
+  /* faq */
+  details { border-bottom: 1px solid var(--line); padding: 4px 0; }
+  details:first-of-type { margin-top: 28px; border-top: 1px solid var(--line); }
+  summary { cursor: pointer; list-style: none; min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-weight: 500; font-size: 17px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-family: "Sora", sans-serif; font-size: 22px; color: var(--muted); }
+  details[open] summary::after { content: "–"; }
+  details p { margin: 0 0 18px; color: var(--muted); max-width: 46em; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
+  footer a { color: var(--cream); }
+
+  :focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<nav aria-label="Main">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/icon.svg" alt="">PDF Scan</a>
+    <div class="links">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#screens">Screens</a>
+      <a href="#download">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Android 10+ · Free and open source</div>
+      <h1>Scan documents.<br><em>Keep them yours.</em></h1>
+      <p class="lead">PDF Scan turns your phone into a document scanner and PDF editor that never goes online. AI page finding, text recognition in 100+ languages, signatures and mark-up, all on your phone. No ads, no tracking, no account.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/anamolgaur/PDF-Scan/releases/latest/download/PdfScan.apk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Download APK
+        </a>
+        <a class="btn ghost" href="https://github.com/anamolgaur/PDF-Scan">View on GitHub</a>
+      </div>
+      <p class="fine">Latest release · works on every Android phone and tablet</p>
+    </div>
+    <div class="hero-phones">
+      <div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: the camera finding a page's corners"><use href="#scr-camera"/></svg></div>
+      <div class="phone" aria-hidden="true"><svg viewBox="0 0 360 760"><use href="#scr-home"/></svg></div>
+    </div>
+  </div>
+</header>
+
+<section aria-labelledby="promise-h">
+  <div class="wrap">
+    <h2 id="promise-h">Everything happens on your phone</h2>
+    <p class="sub">Most scanner apps upload your pages, show ads or want a subscription. PDF Scan does none of that. Internet access is off by default; the app only goes online when you choose to download a language.</p>
+    <div class="promise">
+      <div><b>0</b><span>ads, trackers or analytics</span></div>
+      <div><b>0</b><span>accounts or sign-ups</span></div>
+      <div><b>100+</b><span>languages read offline</span></div>
+      <div><b>100%</b><span>open source code</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="screens" aria-labelledby="screens-h">
+  <div class="wrap">
+    <h2 id="screens-h">A quick look</h2>
+    <p class="sub">Maroon and cream, or AMOLED black for night. Flat, quiet, and out of the way.</p>
+    <div class="gallery" tabindex="0" aria-label="App screens, scroll sideways">
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: library of scans"><use href="#scr-home"/></svg></div><figcaption class="shot-caption">Your library</figcaption></figure>
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: camera finding a page"><use href="#scr-camera"/></svg></div><figcaption class="shot-caption">AI page finding</figcaption></figure>
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: signing a page"><use href="#scr-sign"/></svg></div><figcaption class="shot-caption">Mark up and sign</figcaption></figure>
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: searching text in scans"><use href="#scr-search"/></svg></div><figcaption class="shot-caption">Search inside every page</figcaption></figure>
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: QR code result"><use href="#scr-qr"/></svg></div><figcaption class="shot-caption">QR and barcodes</figcaption></figure>
+      <figure><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: settings in AMOLED black"><use href="#scr-settings"/></svg></div><figcaption class="shot-caption">AMOLED black</figcaption></figure>
+    </div>
+    <p class="note">Screens shown are illustrations of the app.</p>
+  </div>
+</section>
+
+<section id="features" aria-labelledby="features-h">
+  <div class="wrap">
+    <h2 id="features-h">Everything a scanner should do</h2>
+    <div class="features">
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="7" width="8" height="10" rx="1"/></svg>
+        <h3>Finds the page for you</h3>
+        <p>An on-device AI model spots the page's corners, even on a cluttered or white desk, then snaps the crop onto the real edges. Auto capture takes the shot when you hold still.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="17.5" cy="16.5" r="3"/><path d="M20 19l2 2"/></svg>
+        <h3>Reads every page</h3>
+        <p>Text recognition in English plus 100+ free downloadable languages, from Hindi, Tamil and Bengali to Chinese, Japanese and European languages. Every PDF is searchable.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3-1 4-6 6-6s1 5 3 5 3-3 4-3 2 2 5 1"/><path d="M3 21h18"/></svg>
+        <h3>Mark up and sign</h3>
+        <p>Pen, highlighter, boxes and arrows. Draw your signature once and place it anywhere. Edit existing PDFs too, and their original text stays sharp.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+        <h3>Clean, sharp PDFs</h3>
+        <p>Filters for colour, greyscale and black-and-white scans, glare reduction, an eraser for smudges, three file sizes and AES-256 passwords.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M8 9h3v3H8zM14 9h2M14 12h2"/></svg>
+        <h3>ID cards, QR, books</h3>
+        <p>Front and back of a card on one A4 page at real size. QR and barcode reading with Wi-Fi and UPI support. Split book spreads and flatten curved lines.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <h3>Locked and private</h3>
+        <p>Lock the app or single folders with fingerprint, face or PIN. Hide it from recent apps. A recycle bin keeps deleted pages for 30 days.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="ai-h">
+  <div class="wrap split">
+    <div>
+      <h2 id="ai-h">Crops that land on the edge</h2>
+      <p class="sub">PDF Scan uses DocAligner's most accurate corner model, run on your phone's processor. It sees the photo at its real shape, and the classic detector stays on as a backup. Then each side is snapped onto the page's real edge, ignoring text lines and shadows.</p>
+      <div class="bars" role="img" aria-label="Typical corner error on 40 test photos: classic detector 62 pixels, PDF Scan 7.5 5 pixels">
+        <div class="bar"><span>Classic detector</span><div class="track"><div class="fill dim" style="width:100%"></div></div><b>62 px</b></div>
+        <div class="bar"><span>PDF Scan 7.5</span><div class="track"><div class="fill" style="width:8%"></div></div><b>5 px</b></div>
+      </div>
+      <p class="note" style="margin-top:12px">Typical corner error on 40 test photos (900 × 1200 px). Lower is better.</p>
+    </div>
+    <div style="display:flex;justify-content:center"><div class="phone"><svg viewBox="0 0 360 760" role="img" aria-label="Illustration: editor cropping a page"><use href="#scr-crop"/></svg></div></div>
+  </div>
+</section>
+
+<section class="download" id="download" aria-labelledby="dl-h">
+  <div class="wrap">
+    <h2 id="dl-h">Download PDF Scan</h2>
+    <p class="sub">Free, for Android 10 or newer. Updating? Install over your current version and your scans are kept.</p>
+    <div class="dl-grid">
+      <div class="dl">
+        <h3>PdfScan.apk</h3>
+        <p>Works on every Android phone, tablet and Chromebook. Pick this one if you're not sure.</p>
+        <a class="btn primary" href="https://github.com/anamolgaur/PDF-Scan/releases/latest/download/PdfScan.apk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Download · about 135 MB
+        </a>
+      </div>
+      <div class="dl">
+        <h3>PdfScan-arm64-smaller.apk</h3>
+        <p>A smaller download for most phones from the last few years (64-bit ARM).</p>
+        <a class="btn ghost" href="https://github.com/anamolgaur/PDF-Scan/releases/latest/download/PdfScan-arm64-smaller.apk">Download · about 104 MB</a>
+      </div>
+    </div>
+    <ol class="steps">
+      <li><b>Download the APK</b> on your phone.</li>
+      <li><b>Open it.</b> If asked, allow "Install unknown apps" for your browser or file manager.</li>
+      <li><b>Tap Install.</b> That's it. No account needed.</li>
+    </ol>
+    <p class="fine">All versions and release notes are on the <a href="https://github.com/anamolgaur/PDF-Scan/releases">releases page</a>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="faq-h">
+  <div class="wrap">
+    <h2 id="faq-h">Questions</h2>
+    <details><summary>Why isn't it on the Play Store?</summary><p>PDF Scan is a personal, open-source project shared with family, friends and anyone who wants it. Installing the APK directly from this page or GitHub is safe; Android just asks you to allow it once.</p></details>
+    <details><summary>Does it really work without internet?</summary><p>Yes. Scanning, AI page finding, text recognition, editing and search all run on your phone. Internet access is off by default and is only used, after asking, to download extra recognition languages.</p></details>
+    <details><summary>Why is the download so big?</summary><p>Most of it is the AI model that finds pages and the text-recognition engine. They are big so they can run fully on your phone instead of on someone's server.</p></details>
+    <details><summary>Can I edit PDFs I already have?</summary><p>Yes. Open any PDF and mark it up, sign it, turn, reorder or remove pages. Pages you only mark up keep their original sharp, selectable text.</p></details>
+    <details><summary>Is it really free?</summary><p>Yes, with no ads, no in-app purchases and no subscriptions. The code is open source under the Apache License 2.0.</p></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Anamol Gaur · Code: Apache 2.0 · Music: CC BY 4.0</span>
+    <span>Page model: <a href="https://github.com/DocsaidLab/DocAligner">DocAligner</a> (Apache 2.0) · <a href="https://github.com/anamolgaur/PDF-Scan">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<!-- Screen illustrations, drawn in the app's own colours and fonts (shared by every phone frame above). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <style>
+      .t { font-family: "DM Sans", sans-serif; }
+      .h { font-family: "Sora", sans-serif; font-weight: 600; }
+    </style>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a22"/><stop offset="1" stop-color="#1e1612"/></linearGradient>
+
+    <!-- small page thumbnail -->
+    <g id="thumb">
+      <rect width="56" height="72" rx="4" fill="#F4EBDD"/>
+      <rect x="8" y="12" width="34" height="4" rx="2" fill="#4A1521"/>
+      <rect x="8" y="22" width="40" height="3" rx="1.5" fill="#B9A08C"/>
+      <rect x="8" y="30" width="36" height="3" rx="1.5" fill="#B9A08C"/>
+      <rect x="8" y="38" width="40" height="3" rx="1.5" fill="#B9A08C"/>
+      <rect x="8" y="46" width="24" height="3" rx="1.5" fill="#B9A08C"/>
+    </g>
+    <g id="statusbar">
+      <text x="24" y="30" class="t" font-size="13" fill="#F4EBDD">9:41</text>
+      <rect x="306" y="21" width="22" height="11" rx="3" fill="none" stroke="#F4EBDD" stroke-width="1.4"/>
+      <rect x="308" y="23" width="15" height="7" rx="1.5" fill="#F4EBDD"/>
+    </g>
+
+    <!-- HOME -->
+    <g id="scr-home">
+      <rect width="360" height="760" fill="#4A1521"/>
+      <use href="#statusbar"/>
+      <text x="24" y="86" class="h" font-size="26" fill="#F4EBDD">PDF Scan</text>
+      <circle cx="318" cy="78" r="18" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+      <circle cx="315" cy="75" r="6" fill="none" stroke="#F4EBDD" stroke-width="1.8"/><path d="M319.5 79.5l5 5" stroke="#F4EBDD" stroke-width="1.8" stroke-linecap="round"/>
+      <rect x="24" y="110" width="150" height="40" rx="12" fill="#F4EBDD"/>
+      <text x="99" y="135" class="t" font-size="14" font-weight="500" fill="#4A1521" text-anchor="middle">Scans</text>
+      <rect x="182" y="110" width="154" height="40" rx="12" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+      <text x="259" y="135" class="t" font-size="14" fill="#D9C3AE" text-anchor="middle">On this phone</text>
+      <g class="t" font-size="13">
+        <rect x="24" y="166" width="48" height="32" rx="16" fill="#5E1B2A" stroke="#F4EBDD" stroke-width="1.2"/><text x="48" y="186" fill="#F4EBDD" text-anchor="middle">All</text>
+        <rect x="80" y="166" width="78" height="32" rx="16" fill="none" stroke="#7A2E3E" stroke-width="1.2"/><text x="119" y="186" fill="#D9C3AE" text-anchor="middle">College</text>
+        <rect x="166" y="166" width="62" height="32" rx="16" fill="none" stroke="#7A2E3E" stroke-width="1.2"/><text x="197" y="186" fill="#D9C3AE" text-anchor="middle">Bills</text>
+        <rect x="236" y="166" width="100" height="32" rx="16" fill="none" stroke="#7A2E3E" stroke-width="1.2"/><text x="286" y="186" fill="#D9C3AE" text-anchor="middle">ID · locked</text>
+      </g>
+      <g transform="translate(24 218)">
+        <rect width="312" height="96" rx="14" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+        <use href="#thumb" transform="translate(12 12)"/>
+        <text x="84" y="38" class="h" font-size="15" fill="#F4EBDD">Physics notes · Unit 3</text>
+        <text x="84" y="60" class="t" font-size="13" fill="#D9C3AE">12 pages · searchable</text>
+        <text x="84" y="78" class="t" font-size="12" fill="#B9A08C">Today, 9:12</text>
+      </g>
+      <g transform="translate(24 326)">
+        <rect width="312" height="96" rx="14" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+        <use href="#thumb" transform="translate(12 12)"/>
+        <text x="84" y="38" class="h" font-size="15" fill="#F4EBDD">Electricity bill</text>
+        <text x="84" y="60" class="t" font-size="13" fill="#D9C3AE">2 pages · Bills</text>
+        <text x="84" y="78" class="t" font-size="12" fill="#B9A08C">Yesterday</text>
+      </g>
+      <g transform="translate(24 434)">
+        <rect width="312" height="96" rx="14" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+        <use href="#thumb" transform="translate(12 12)"/>
+        <text x="84" y="38" class="h" font-size="15" fill="#F4EBDD">Rent agreement</text>
+        <text x="84" y="60" class="t" font-size="13" fill="#D9C3AE">6 pages · signed</text>
+        <text x="84" y="78" class="t" font-size="12" fill="#B9A08C">3 Nov</text>
+      </g>
+      <g transform="translate(24 542)">
+        <rect width="312" height="96" rx="14" fill="none" stroke="#7A2E3E" stroke-width="1.5"/>
+        <use href="#thumb" transform="translate(12 12)"/>
+        <text x="84" y="38" class="h" font-size="15" fill="#F4EBDD">Maths CAT practice</text>
+        <text x="84" y="60" class="t" font-size="13" fill="#D9C3AE">4 pages · College</text>
+        <text x="84" y="78" class="t" font-size="12" fill="#B9A08C">28 Oct</text>
+      </g>
+      <rect x="24" y="672" width="150" height="52" rx="14" fill="#F4EBDD"/>
+      <text x="99" y="703" class="t" font-size="15" font-weight="500" fill="#4A1521" text-anchor="middle">Scan</text>
+      <rect x="186" y="672" width="150" height="52" rx="14" fill="none" stroke="#F4EBDD" stroke-width="1.5"/>
+      <text x="261" y="703" class="t" font-size="15" fill="#F4EBDD" text-anchor="middle">Import</text>
+    </g>
+
+    <!-- CAMERA -->
+    <g id="scr-camera">
+      <rect width="360" height="760" fill="#000"/>
+      <use href="#statusbar"/>
+      <path d="M30 70l12 12m0-12L30 82" stroke="#F4EBDD" stroke-width="2" stroke-linecap="round"/>
+      <rect x="244" y="60" width="64" height="32" rx="16" fill="#F4EBDD"/><text x="276" y="81" class="t" font-size="13" font-weight="500" fill="#000" text-anchor="middle">Auto</text>
+      <path d="M326 64l-6 12h6l-4 10" stroke="#F4EBDD" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+      <rect x="0" y="108" width="360" height="480" fill="url(#desk)"/>
+      <circle cx="60" cy="160" r="26" fill="#2c211b"/><rect x="270" y="500" width="70" height="40" rx="6" fill="#2a1f1a"/>
+      <path d="M92 168 L262 150 L286 486 L78 500 Z" fill="#EFE8DC"/>
+      <g stroke="#9c9186" stroke-width="5" stroke-linecap="round">
+        <path d="M112 210 L232 198"/><path d="M114 236 L250 222"/><path d="M116 262 L246 250"/><path d="M118 288 L252 276"/><path d="M120 314 L210 306"/>
+        <path d="M122 356 L256 344"/><path d="M124 382 L258 370"/><path d="M126 408 L230 398"/><path d="M128 434 L262 422"/>
+      </g>
+      <path d="M92 168 L262 150 L286 486 L78 500 Z" fill="#9E2F45" fill-opacity=".14" stroke="#F4EBDD" stroke-width="2.5"/>
+      <g fill="#F4EBDD"><circle cx="92" cy="168" r="7"/><circle cx="262" cy="150" r="7"/><circle cx="286" cy="486" r="7"/><circle cx="78" cy="500" r="7"/></g>
+      <rect x="100" y="604" width="160" height="30" rx="15" fill="#160A0D" stroke="#3F1A23"/>
+      <text x="180" y="624" class="t" font-size="13" fill="#F4EBDD" text-anchor="middle">Hold steady</text>
+      <g class="t" font-size="12" text-anchor="middle">
+        <text x="70" y="664" fill="#B9A08C">PHOTO</text><text x="140" y="664" fill="#F4EBDD" font-weight="500">SCAN</text><text x="214" y="664" fill="#B9A08C">ID CARD</text><text x="290" y="664" fill="#B9A08C">QR</text>
+        <rect x="124" y="672" width="32" height="2" fill="#F4EBDD"/>
+      </g>
+      <circle cx="180" cy="716" r="30" fill="none" stroke="#F4EBDD" stroke-width="3"/>
+      <circle cx="180" cy="716" r="23" fill="#F4EBDD"/>
+      <path d="M180 716 m0 -27 a27 27 0 0 1 23 13" stroke="#9E2F45" stroke-width="3" fill="none" stroke-linecap="round" transform="translate(0 0)"/>
+      <rect x="290" y="696" width="36" height="44" rx="5" fill="#EFE8DC"/><text x="308" y="724" class="t" font-size="13" fill="#4A1521" text-anchor="middle" font-weight="500">3</text>
+    </g>
+
+    <!-- SIGN / MARK UP -->
+    <g id="scr-sign">
+      <rect width="360" height="760" fill="#4A1521"/>
+      <use href="#statusbar"/>
+      <text x="24" y="80" class="h" font-size="18" fill="#F4EBDD">Rent agreement</text>
+      <text x="24" y="102" class="t" font-size="13" fill="#D9C3AE">Page 6 of 6</text>
+      <rect x="28" y="124" width="304" height="420" rx="4" fill="#F4EBDD"/>
+      <rect x="52" y="152" width="150" height="9" rx="4" fill="#4A1521"/>
+      <g fill="#B9A08C"><rect x="52" y="180" width="256" height="5" rx="2.5"/><rect x="52" y="196" width="240" height="5" rx="2.5"/><rect x="52" y="212" width="256" height="5" rx="2.5"/><rect x="52" y="228" width="200" height="5" rx="2.5"/>
+      <rect x="52" y="256" width="256" height="5" rx="2.5"/><rect x="52" y="272" width="230" height="5" rx="2.5"/><rect x="52" y="288" width="256" height="5" rx="2.5"/><rect x="52" y="304" width="150" height="5" rx="2.5"/></g>
+      <rect x="50" y="252" width="200" height="14" fill="#F2D04A" fill-opacity=".55"/>
+      <rect x="52" y="340" width="120" height="5" rx="2.5" fill="#B9A08C"/>
+      <path d="M52 470 h120" stroke="#4A1521" stroke-width="1.2"/>
+      <text x="52" y="490" class="t" font-size="11" fill="#7a6a5e">Tenant</text>
+      <path d="M58 458 c8-26 14-30 18-10 s6 14 12-6 8-14 12 4 4 10 10-2 6-8 10 0 6 4 14-6" stroke="#1d2a6b" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="48" y="420" width="132" height="48" fill="none" stroke="#9E2F45" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <circle cx="180" cy="468" r="6" fill="#9E2F45"/>
+      <path d="M200 380 l70 -40" stroke="#C0392B" stroke-width="3" stroke-linecap="round"/><path d="M262 338 l8 2 -4 8" stroke="#C0392B" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <g transform="translate(0 572)">
+        <line x1="0" y1="0" x2="360" y2="0" stroke="#7A2E3E"/>
+        <g class="t" font-size="11" fill="#D9C3AE" text-anchor="middle">
+          <g transform="translate(40 20)"><path d="M-8 22 l12-12 4 4 -12 12 h-4z" stroke="#F4EBDD" stroke-width="1.6" fill="none"/><text y="50">Pen</text></g>
+          <g transform="translate(110 20)"><rect x="-10" y="10" width="20" height="12" stroke="#F4EBDD" stroke-width="1.6" fill="none"/><text y="50">Highlight</text></g>
+          <g transform="translate(180 20)"><rect x="-26" y="-6" width="52" height="68" rx="12" fill="#5E1B2A" stroke="#F4EBDD" stroke-width="1.2"/><path d="M-10 26 c4-10 6-10 8-2 s4 6 6-2 4-4 6 2" stroke="#F4EBDD" stroke-width="1.8" fill="none"/><text y="50" fill="#F4EBDD">Sign</text></g>
+          <g transform="translate(250 20)"><path d="M-10 26 l20-14" stroke="#F4EBDD" stroke-width="1.6"/><text y="50">Arrow</text></g>
+          <g transform="translate(320 20)"><circle cy="18" r="8" stroke="#F4EBDD" stroke-width="1.6" fill="none"/><text y="50">Circle</text></g>
+        </g>
+      </g>
+      <rect x="24" y="672" width="150" height="52" rx="14" fill="none" stroke="#F4EBDD" stroke-width="1.5"/>
+      <text x="99" y="703" class="t" font-size="15" fill="#F4EBDD" text-anchor="middle">Undo</text>
+      <rect x="186" y="672" width="150" height="52" rx="14" fill="#F4EBDD"/>
+      <text x="261" y="703" class="t" font-size="15" font-weight="500" fill="#4A1521" text-anchor="middle">Done</text>
+    </g>
+
+    <!-- SEARCH -->
+    <g id="scr-search">
+      <rect width="360" height="760" fill="#4A1521"/>
+      <use href="#statusbar"/>
+      <rect x="24" y="58" width="312" height="48" rx="14" fill="none" stroke="#F4EBDD" stroke-width="1.5"/>
+      <circle cx="48" cy="80" r="7" fill="none" stroke="#F4EBDD" stroke-width="1.8"/><path d="M53 85l5 5" stroke="#F4EBDD" stroke-width="1.8" stroke-linecap="round"/>
+      <text x="68" y="87" class="t" font-size="16" fill="#F4EBDD">electric flux</text>
+      <text x="24" y="140" class="t" font-size="13" fill="#D9C3AE">7 results in 3 documents</text>
+      <g transform="translate(24 160)">
+        <text class="h" font-size="15" fill="#F4EBDD" y="18">Physics notes · Unit 3</text>
+        <text class="t" font-size="12" fill="#D9C3AE" y="38">Page 4</text>
+        <text class="t" font-size="13.5" fill="#F4EBDD" y="62">…the total</text>
+        <rect x="70" y="49" width="82" height="19" rx="4" fill="#F4EBDD"/>
+        <text class="t" font-size="13.5" fill="#4A1521" x="74" y="63" font-weight="500">electric flux</text>
+        <text class="t" font-size="13.5" fill="#F4EBDD" x="156" y="62">through a closed</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" y="82">surface equals the enclosed charge…</text>
+        <line x1="0" y1="102" x2="312" y2="102" stroke="#7A2E3E"/>
+      </g>
+      <g transform="translate(24 280)">
+        <text class="h" font-size="15" fill="#F4EBDD" y="18">Physics notes · Unit 3</text>
+        <text class="t" font-size="12" fill="#D9C3AE" y="38">Page 7</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" y="62">Gauss's law relates the</text>
+        <rect x="150" y="49" width="82" height="19" rx="4" fill="#F4EBDD"/>
+        <text class="t" font-size="13.5" fill="#4A1521" x="154" y="63" font-weight="500">electric flux</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" y="82">to the charge inside…</text>
+        <line x1="0" y1="102" x2="312" y2="102" stroke="#7A2E3E"/>
+      </g>
+      <g transform="translate(24 400)">
+        <text class="h" font-size="15" fill="#F4EBDD" y="18">BAPHY105 past paper.pdf</text>
+        <text class="t" font-size="12" fill="#D9C3AE" y="38">On this phone · page 2</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" y="62">Q3. Find the</text>
+        <rect x="88" y="49" width="82" height="19" rx="4" fill="#F4EBDD"/>
+        <text class="t" font-size="13.5" fill="#4A1521" x="92" y="63" font-weight="500">electric flux</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" x="174" y="62">through…</text>
+        <line x1="0" y1="102" x2="312" y2="102" stroke="#7A2E3E"/>
+      </g>
+      <g transform="translate(24 520)">
+        <text class="h" font-size="15" fill="#F4EBDD" y="18">Lab record.docx</text>
+        <text class="t" font-size="12" fill="#D9C3AE" y="38">On this phone · page 11</text>
+        <text class="t" font-size="13.5" fill="#D9C3AE" y="62">…measured the change in</text>
+        <rect x="170" y="49" width="82" height="19" rx="4" fill="#F4EBDD"/>
+        <text class="t" font-size="13.5" fill="#4A1521" x="174" y="63" font-weight="500">electric flux</text>
+      </g>
+    </g>
+
+    <!-- QR -->
+    <g id="scr-qr">
+      <rect width="360" height="760" fill="#000"/>
+      <use href="#statusbar"/>
+      <rect x="0" y="108" width="360" height="480" fill="url(#desk)"/>
+      <rect x="110" y="200" width="140" height="140" fill="#F4EBDD"/>
+      <g fill="#111">
+        <rect x="120" y="210" width="36" height="36"/><rect x="204" y="210" width="36" height="36"/><rect x="120" y="294" width="36" height="36"/>
+        <rect x="166" y="216" width="10" height="10"/><rect x="180" y="230" width="10" height="10"/><rect x="166" y="256" width="20" height="10"/><rect x="194" y="262" width="10" height="20"/><rect x="214" y="256" width="20" height="10"/><rect x="170" y="290" width="10" height="20"/><rect x="190" y="300" width="30" height="10"/><rect x="226" y="290" width="10" height="30"/><rect x="200" y="316" width="10" height="10"/>
+      </g>
+      <g fill="#F4EBDD"><rect x="126" y="216" width="24" height="24"/><rect x="210" y="216" width="24" height="24"/><rect x="126" y="300" width="24" height="24"/></g>
+      <g fill="#111"><rect x="132" y="222" width="12" height="12"/><rect x="216" y="222" width="12" height="12"/><rect x="132" y="306" width="12" height="12"/></g>
+      <rect x="20" y="430" width="320" height="250" rx="18" fill="#160A0D" stroke="#3F1A23" stroke-width="1.5"/>
+      <text x="44" y="470" class="h" font-size="18" fill="#F4EBDD">Wi-Fi details</text>
+      <text x="44" y="502" class="t" font-size="14" fill="#C25468">Network</text>
+      <text x="44" y="524" class="t" font-size="16" fill="#F4EBDD">Hostel_Block_C</text>
+      <text x="44" y="556" class="t" font-size="14" fill="#C25468">Password</text>
+      <text x="44" y="578" class="t" font-size="16" fill="#F4EBDD">••••••••••</text>
+      <rect x="44" y="606" width="128" height="48" rx="12" fill="none" stroke="#F4EBDD" stroke-width="1.5"/>
+      <text x="108" y="635" class="t" font-size="15" fill="#F4EBDD" text-anchor="middle">Copy</text>
+      <rect x="188" y="606" width="128" height="48" rx="12" fill="#7A2234"/>
+      <text x="252" y="635" class="t" font-size="15" font-weight="500" fill="#F4EBDD" text-anchor="middle">Connect</text>
+    </g>
+
+    <!-- SETTINGS (AMOLED) -->
+    <g id="scr-settings">
+      <rect width="360" height="760" fill="#000"/>
+      <use href="#statusbar"/>
+      <text x="24" y="86" class="h" font-size="26" fill="#F4EBDD">Settings</text>
+      <text x="24" y="130" class="t" font-size="12" fill="#C25468" letter-spacing="1.2">APPEARANCE</text>
+      <rect x="24" y="142" width="120" height="40" rx="12" fill="none" stroke="#3F1A23" stroke-width="1.5"/><text x="84" y="167" class="t" font-size="14" fill="#C25468" text-anchor="middle">Maroon</text>
+      <rect x="152" y="142" width="150" height="40" rx="12" fill="#7A2234"/><text x="227" y="167" class="t" font-size="14" fill="#F4EBDD" text-anchor="middle" font-weight="500">AMOLED black</text>
+      <text x="24" y="226" class="t" font-size="12" fill="#C25468" letter-spacing="1.2">SCANNING</text>
+      <g class="t" font-size="15" fill="#F4EBDD">
+        <text x="24" y="262">Smart page finding</text><text x="24" y="282" font-size="12.5" fill="#C25468">On-device AI · nothing is sent</text>
+        <rect x="282" y="252" width="48" height="26" rx="13" fill="#7A2234"/><circle cx="317" cy="265" r="10" fill="#F4EBDD"/>
+        <line x1="24" y1="300" x2="336" y2="300" stroke="#3F1A23"/>
+        <text x="24" y="334">Capture automatically</text>
+        <rect x="282" y="320" width="48" height="26" rx="13" fill="#7A2234"/><circle cx="317" cy="333" r="10" fill="#F4EBDD"/>
+        <line x1="24" y1="356" x2="336" y2="356" stroke="#3F1A23"/>
+      </g>
+      <text x="24" y="398" class="t" font-size="12" fill="#C25468" letter-spacing="1.2">PRIVACY</text>
+      <g class="t" font-size="15" fill="#F4EBDD">
+        <text x="24" y="434">Lock the app</text><text x="24" y="454" font-size="12.5" fill="#C25468">Fingerprint, face or PIN</text>
+        <rect x="282" y="424" width="48" height="26" rx="13" fill="#7A2234"/><circle cx="317" cy="437" r="10" fill="#F4EBDD"/>
+        <line x1="24" y1="472" x2="336" y2="472" stroke="#3F1A23"/>
+        <text x="24" y="506">Allow internet access</text><text x="24" y="526" font-size="12.5" fill="#C25468">Off · only for language downloads</text>
+        <rect x="282" y="494" width="48" height="26" rx="13" fill="none" stroke="#3F1A23" stroke-width="1.5"/><circle cx="295" cy="507" r="9" fill="#C25468"/>
+        <line x1="24" y1="546" x2="336" y2="546" stroke="#3F1A23"/>
+      </g>
+      <text x="24" y="588" class="t" font-size="12" fill="#C25468" letter-spacing="1.2">TEXT</text>
+      <text x="24" y="622" class="t" font-size="15" fill="#F4EBDD">Languages</text>
+      <text x="24" y="642" class="t" font-size="12.5" fill="#C25468">English, Hindi, Marathi, Japanese</text>
+      <rect x="226" y="608" width="110" height="44" rx="12" fill="none" stroke="#F4EBDD" stroke-width="1.5"/><text x="281" y="635" class="t" font-size="14" fill="#F4EBDD" text-anchor="middle">Choose</text>
+    </g>
+
+    <!-- CROP -->
+    <g id="scr-crop">
+      <rect width="360" height="760" fill="#4A1521"/>
+      <use href="#statusbar"/>
+      <text x="24" y="80" class="h" font-size="18" fill="#F4EBDD">Crop</text>
+      <rect x="276" y="60" width="60" height="32" rx="16" fill="none" stroke="#F4EBDD" stroke-width="1.2"/><text x="306" y="81" class="t" font-size="13" fill="#F4EBDD" text-anchor="middle">Auto</text>
+      <rect x="20" y="110" width="320" height="480" fill="url(#desk)"/>
+      <path d="M78 152 L276 168 L262 548 L60 528 Z" fill="#EFE8DC"/>
+      <g stroke="#9c9186" stroke-width="5" stroke-linecap="round">
+        <path d="M100 200 L240 210"/><path d="M98 228 L250 238"/><path d="M96 256 L236 266"/><path d="M94 284 L248 294"/><path d="M92 312 L190 318"/>
+        <path d="M90 352 L244 362"/><path d="M88 380 L240 390"/><path d="M86 408 L210 416"/><path d="M84 436 L238 446"/>
+      </g>
+      <path d="M78 152 L276 168 L262 548 L60 528 Z" fill="none" stroke="#F4EBDD" stroke-width="2.5"/>
+      <g fill="#4A1521" stroke="#F4EBDD" stroke-width="3"><circle cx="78" cy="152" r="10"/><circle cx="276" cy="168" r="10"/><circle cx="262" cy="548" r="10"/><circle cx="60" cy="528" r="10"/></g>
+      <circle cx="96" cy="112" r="0"/>
+      <g transform="translate(0 610)" class="t" font-size="11" fill="#D9C3AE" text-anchor="middle">
+        <g transform="translate(60 0)"><rect x="-26" y="0" width="52" height="56" rx="12" fill="#5E1B2A" stroke="#F4EBDD" stroke-width="1.2"/><path d="M-8 14v14h16" stroke="#F4EBDD" stroke-width="1.8" fill="none"/><path d="M-12 18h12v14" stroke="#F4EBDD" stroke-width="1.8" fill="none"/><text y="48" fill="#F4EBDD">Crop</text></g>
+        <g transform="translate(130 0)"><circle cy="22" r="9" stroke="#F4EBDD" stroke-width="1.6" fill="none"/><text y="48">Filters</text></g>
+        <g transform="translate(200 0)"><path d="M-10 16h20M-10 26h20" stroke="#F4EBDD" stroke-width="1.6"/><circle cx="-3" cy="16" r="3" fill="#4A1521" stroke="#F4EBDD" stroke-width="1.6"/><circle cx="5" cy="26" r="3" fill="#4A1521" stroke="#F4EBDD" stroke-width="1.6"/><text y="48">Adjust</text></g>
+        <g transform="translate(270 0)"><path d="M-8 26a10 10 0 1 1 8 4" stroke="#F4EBDD" stroke-width="1.6" fill="none"/><text y="48">Rotate</text></g>
+      </g>
+      <rect x="24" y="684" width="150" height="48" rx="14" fill="none" stroke="#F4EBDD" stroke-width="1.5"/>
+      <text x="99" y="713" class="t" font-size="15" fill="#F4EBDD" text-anchor="middle">Cancel</text>
+      <rect x="186" y="684" width="150" height="48" rx="14" fill="#F4EBDD"/>
+      <text x="261" y="713" class="t" font-size="15" font-weight="500" fill="#4A1521" text-anchor="middle">Save</text>
+    </g>
+  </defs>
+</svg>
+</body>
+</html>
