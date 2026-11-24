@@ -1,5 +1,7 @@
 # PDF Scan
 
+Website and downloads: https://anamolgaur.github.io/PDF-Scan/
+
 A private document scanner for Android. Scanning, editing, text recognition and search all
 run on the phone. No ads, no telemetry, no account. Internet access is off by default and is
 used only if you choose to link Google Drive.
@@ -55,8 +57,10 @@ used only if you choose to link Google Drive.
   so when any page uses them the PDF is written as a searchable scan-style PDF instead.
 
 **Appearance and privacy**
-- Settings › Appearance: Maroon, or AMOLED black (true black with maroon and cream text, easy
-  on OLED screens at night). The camera keeps its own dark look.
+- Settings › Appearance › Theme: Auto (Cream by day, Maroon in dark mode), Maroon, Cream,
+  White or AMOLED black, in Vault's design language: one paper and one ink colour per theme,
+  quiet raised panels, hairline rules and 8 dp corners. Accent: the theme's own (Vault), or
+  maroon, red, ember, gold, green, blue or violet. Chip rows wrap instead of squeezing labels.
 - Settings › Privacy › "Lock the app": fingerprint, face or the phone's PIN/pattern when the app
   is opened or comes back from the background.
 - Lock single folders: long-press a folder chip › Lock. Its documents stay hidden until you

@@ -41,48 +41,111 @@ import java.util.Locale;
  */
 final class Ui {
     // palette
-    static final int MAROON = 0xFF4A1521;
+    static final int MAROON = 0xFF3A0200;
     static final int CREAM = 0xFFF4EBDD;
-    // roles (set by applyTheme: maroon, or AMOLED black with maroon and cream type)
+    // roles, set by applyTheme from the theme's paper and ink (Vault's design tokens)
     static int BG = MAROON;
-    static int SURFACE = 0xFF5A1D2A;
-    static int LINE = 0xFF6B2F3B;
+    static int SURFACE = 0xFF451010;
+    static int LINE = 0x1FF4EBDD;
     static int INK = CREAM;
-    static int MUTED = 0xFFC8ADA0;
+    static int MUTED = 0xFFC6BCB1;
     static int ACCENT = CREAM;
     static int ON_ACCENT = MAROON;
     static int RIPPLE = 0x33F4EBDD;
-    static int RIPPLE_ON_ACCENT = 0x334A1521;
+    static int RIPPLE_ON_ACCENT = 0x333A0200;
     static boolean amoled;
+    static boolean light;
+    /** Corner radius for every panel, button, chip and field. */
+    static final int RADIUS = 8;
+
+    static final String[] THEMES = {"auto", "maroon", "cream", "white", "amoled"};
+    static final String[] THEME_LABELS = {"Auto", "Maroon", "Cream", "White", "AMOLED"};
+    static final String[] ACCENTS = {"vault", "maroon", "red", "ember", "gold", "green", "blue", "violet"};
+    static final String[] ACCENT_LABELS = {"Vault", "Maroon", "Red", "Ember", "Gold", "Green", "Blue", "Violet"};
+    private static final int[] ACCENT_COLORS = {0, 0xFF7A1C1C, 0xFFC62828, 0xFFD2561E, 0xFFC9971C, 0xFF2E7D4F, 0xFF2F5FA8, 0xFF6A4BAE};
+
+    /** Mixes a over b: t = 0 gives b, 1 gives a. */
+    static int mix(int a, int b, float t) {
+        int r = Math.round(((a >> 16) & 0xFF) * t + ((b >> 16) & 0xFF) * (1 - t));
+        int g = Math.round(((a >> 8) & 0xFF) * t + ((b >> 8) & 0xFF) * (1 - t));
+        int bl = Math.round((a & 0xFF) * t + (b & 0xFF) * (1 - t));
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
+    }
+
+    private static double lum(int c) {
+        double[] v = {((c >> 16) & 0xFF) / 255.0, ((c >> 8) & 0xFF) / 255.0, (c & 0xFF) / 255.0};
+        for (int i = 0; i < 3; i++) v[i] = v[i] <= 0.03928 ? v[i] / 12.92 : Math.pow((v[i] + 0.055) / 1.055, 2.4);
+        return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    }
+
+    static double contrast(int a, int b) {
+        double x = lum(a), y = lum(b);
+        return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    }
+
+    /** The theme actually shown: Auto is Cream by day and Maroon when the phone is in dark mode. */
+    static String resolve(String theme, boolean systemNight) {
+        if (theme == null || theme.equals("auto")) return systemNight ? "maroon" : "cream";
+        return theme;
+    }
 
     /**
-     * Two looks, one design: maroon ground with cream type, or true black (pixels off on AMOLED
-     * screens, saving battery) with cream type, maroon secondary text and maroon buttons.
-     * Call before any screen is built.
+     * Vault's look: a paper colour and an ink colour per theme; raised panels are the paper lifted
+     * slightly towards the ink, rules are the ink at 12%, secondary text the ink at 72%. The accent
+     * is the theme's own ink unless another is picked. Call before any screen is built.
      */
-    static void applyTheme(boolean black) {
-        amoled = black;
-        if (black) {
-            BG = 0xFF000000;
-            SURFACE = 0xFF160A0D;
-            LINE = 0xFF3F1A23;
-            INK = CREAM;
-            MUTED = 0xFFC25468;          // maroon, light enough to read on black (4.8:1)
-            ACCENT = 0xFF7A2234;         // maroon pill with cream text (8:1)
-            ON_ACCENT = CREAM;
-            RIPPLE = 0x33F4EBDD;
-            RIPPLE_ON_ACCENT = 0x33F4EBDD;
-        } else {
-            BG = MAROON;
-            SURFACE = 0xFF5A1D2A;
-            LINE = 0xFF6B2F3B;
-            INK = CREAM;
-            MUTED = 0xFFC8ADA0;
-            ACCENT = CREAM;
-            ON_ACCENT = MAROON;
-            RIPPLE = 0x33F4EBDD;
-            RIPPLE_ON_ACCENT = 0x334A1521;
+    static void applyTheme(String theme, String accent, boolean systemNight) {
+        String t = resolve(theme, systemNight);
+        int paper, ink;
+        switch (t) {
+            case "cream": paper = 0xFFF7F1E6; ink = 0xFF6B0A0A; break;
+            case "white": paper = 0xFFFFFFFF; ink = 0xFF6B0A0A; break;
+            case "amoled": paper = 0xFF000000; ink = 0xFFEDEDED; break;
+            default: paper = 0xFF3A0200; ink = 0xFFF4EBDD; break;
         }
+        amoled = t.equals("amoled");
+        light = t.equals("cream") || t.equals("white");
+        BG = paper;
+        INK = ink;
+        SURFACE = mix(ink, paper, light ? 0.035f : 0.06f);
+        LINE = mix(ink, paper, 0.12f);
+        MUTED = mix(ink, paper, 0.72f);
+        int idx = 0;
+        for (int i = 0; i < ACCENTS.length; i++) if (ACCENTS[i].equals(accent)) idx = i;
+        ACCENT = idx == 0 ? ink : ACCENT_COLORS[idx];
+        // on black, a dark accent needs lifting to be seen
+        if (contrast(ACCENT, paper) < 3) ACCENT = mix(light ? 0xFF000000 : 0xFFFFFFFF, ACCENT, 0.35f);
+        ON_ACCENT = idx == 0 ? paper : (contrast(0xFFFFFFFF, ACCENT) >= contrast(0xFF1A1A1A, ACCENT) ? 0xFFFFFFFF : 0xFF1A1A1A);
+        RIPPLE = (ink & 0x00FFFFFF) | 0x26000000;
+        RIPPLE_ON_ACCENT = (ON_ACCENT & 0x00FFFFFF) | 0x33000000;
+    }
+
+    /** Kept for older callers. */
+    static void applyTheme(boolean black) {
+        applyTheme(black ? "amoled" : "maroon", "vault", false);
+    }
+
+    /** The window style that matches the current theme (dialogs, system bars, text fields). */
+    static int themeStyle(String theme, boolean systemNight) {
+        switch (resolve(theme, systemNight)) {
+            case "cream": return R.style.Theme_PdfScan_Cream;
+            case "white": return R.style.Theme_PdfScan_White;
+            case "amoled": return R.style.Theme_PdfScan_Black;
+            default: return R.style.Theme_PdfScan;
+        }
+    }
+
+    /** Colours the window and system bars to match, with dark icons on light themes. */
+    static void styleWindow(android.app.Activity a) {
+        android.view.Window w = a.getWindow();
+        w.setBackgroundDrawable(new ColorDrawable(BG));
+        w.setStatusBarColor(BG);
+        w.setNavigationBarColor(BG);
+        View d = w.getDecorView();
+        int f = d.getSystemUiVisibility();
+        if (light) f |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        else f &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        d.setSystemUiVisibility(f);
     }
 
     interface Job {
@@ -219,7 +282,7 @@ final class Ui {
         GradientDrawable g = new GradientDrawable();
         g.setColor(fill);
         if (stroke != 0) g.setStroke(dp(c, 1), stroke);
-        g.setCornerRadius(dp(c, radiusDp));
+        g.setCornerRadius(dp(c, Math.min(radiusDp, RADIUS)));
         return g;
     }
 
@@ -232,7 +295,7 @@ final class Ui {
 
     /** Rounds a view's corners (e.g. page thumbnails). */
     static void round(View v, int radiusDp) {
-        final float r = dp(v.getContext(), radiusDp);
+        final float r = dp(v.getContext(), (float) Math.min(radiusDp, RADIUS));
         v.setOutlineProvider(new ViewOutlineProvider() {
             @Override
             public void getOutline(View view, Outline o) {
@@ -286,11 +349,15 @@ final class Ui {
         b.setMinimumWidth(dp(c, 48));
         b.setPadding(dp(c, 18), 0, dp(c, 18), 0);
         b.setGravity(Gravity.CENTER);
-        int radius = h / 2;
+        int radius = dp(c, RADIUS);
         GradientDrawable fill = new GradientDrawable();
         fill.setColor(ACCENT);
         fill.setCornerRadius(radius);
-        b.setBackground(primary ? ripple(fill, radius, RIPPLE_ON_ACCENT) : ripple(null, radius, RIPPLE));
+        GradientDrawable quiet = new GradientDrawable();
+        quiet.setColor(0x00000000);
+        quiet.setStroke(dp(c, 1), LINE);
+        quiet.setCornerRadius(radius);
+        b.setBackground(primary ? ripple(fill, radius, RIPPLE_ON_ACCENT) : ripple(quiet, radius, RIPPLE));
         // setBackground can replace the padding with the drawable's own: put it back
         b.setPadding(dp(c, 18), 0, dp(c, 18), 0);
         b.setSingleLine(true);
@@ -406,7 +473,7 @@ final class Ui {
     static void setChipSelected(Context c, Button b, boolean selected) {
         b.setSelected(selected);
         b.setTextColor(selected ? ON_ACCENT : INK);
-        int r = dp(c, 22);
+        int r = dp(c, RADIUS);
         GradientDrawable g = new GradientDrawable();
         g.setCornerRadius(r);
         // inset so the 44dp touch area holds a 36dp visual pill
@@ -422,13 +489,9 @@ final class Ui {
         b.setPadding(dp(c, 18), 0, dp(c, 18), 0);
     }
 
-    /** A horizontal, scrollable row of mutually exclusive chips. Returns the chips in order. */
+    /** Mutually exclusive chips that wrap onto new lines instead of squeezing. Returns them in order. */
     static List<Button> chipRow(Context c, LinearLayout parent, String[] labels, int selected, final OnPick onPick) {
-        HorizontalScrollView scroll = new HorizontalScrollView(c);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setClipToPadding(false);
-        LinearLayout row = new LinearLayout(c);
-        row.setOrientation(LinearLayout.HORIZONTAL);
+        Flow row = new Flow(c, dp(c, 8), 0);
         final List<Button> chips = new ArrayList<>();
         for (int i = 0; i < labels.length; i++) {
             final int idx = i;
@@ -438,15 +501,67 @@ final class Ui {
                 for (int k = 0; k < chips.size(); k++) setChipSelected(c, chips.get(k), k == idx);
                 onPick.picked(idx);
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, dp(c, 8), 0);
-            row.addView(b, lp);
+            row.addView(b);
             chips.add(b);
         }
-        scroll.addView(row);
-        parent.addView(scroll, full(c, 4));
+        parent.addView(row, full(c, 4));
         return chips;
+    }
+
+    /** Lays children left to right, starting a new line when the next one doesn't fit. */
+    static final class Flow extends ViewGroup {
+        private final int hGap;
+        private final int vGap;
+
+        Flow(Context c, int hGap, int vGap) {
+            super(c);
+            this.hGap = hGap;
+            this.vGap = vGap;
+        }
+
+        @Override
+        protected void onMeasure(int wSpec, int hSpec) {
+            int max = MeasureSpec.getSize(wSpec);
+            if (MeasureSpec.getMode(wSpec) == MeasureSpec.UNSPECIFIED) max = Integer.MAX_VALUE;
+            int x = 0, y = 0, lineH = 0, widest = 0;
+            for (int i = 0; i < getChildCount(); i++) {
+                View ch = getChildAt(i);
+                if (ch.getVisibility() == GONE) continue;
+                ch.measure(MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+                int w = ch.getMeasuredWidth(), h = ch.getMeasuredHeight();
+                if (x > 0 && x + w > max) {
+                    x = 0;
+                    y += lineH + vGap;
+                    lineH = 0;
+                }
+                x += w + hGap;
+                widest = Math.max(widest, x - hGap);
+                lineH = Math.max(lineH, h);
+            }
+            int width = MeasureSpec.getMode(wSpec) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(wSpec) : Math.min(widest, max);
+            setMeasuredDimension(width, y + lineH);
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            int max = r - l;
+            int x = 0, y = 0, lineH = 0;
+            for (int i = 0; i < getChildCount(); i++) {
+                View ch = getChildAt(i);
+                if (ch.getVisibility() == GONE) continue;
+                int w = ch.getMeasuredWidth(), h = ch.getMeasuredHeight();
+                if (x > 0 && x + w > max) {
+                    x = 0;
+                    y += lineH + vGap;
+                    lineH = 0;
+                }
+                boolean rtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+                int left = rtl ? max - x - w : x;
+                ch.layout(left, y, left + w, y + h);
+                x += w + hGap;
+                lineH = Math.max(lineH, h);
+            }
+        }
     }
 
     /** A pill-shaped text field on a slightly lighter surface, with an optional leading icon. */

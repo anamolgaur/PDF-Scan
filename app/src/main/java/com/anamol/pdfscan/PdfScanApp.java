@@ -12,7 +12,7 @@ public class PdfScanApp extends Application {
     public void onCreate() {
         super.onCreate();
         Diag.init(this);
-        Ui.applyTheme(Prefs.amoled(this));
+        Ui.applyTheme(Prefs.theme(this), Prefs.accent(this), Prefs.systemNight(this));
         PageModel.init(this);
         new Thread(() -> {
             DocStore store = new DocStore(this);
@@ -38,12 +38,16 @@ public class PdfScanApp extends Application {
             @Override
             public void onActivityPreCreated(Activity a, Bundle b) {
                 // AMOLED black look for every screen except the camera (already black)
-                if (Ui.amoled && !(a instanceof CameraActivity)) a.setTheme(R.style.Theme_PdfScan_Black);
+                if (a instanceof CameraActivity) return;
+                // Auto follows the phone's dark mode, which can change while the app is open
+                Ui.applyTheme(Prefs.theme(a), Prefs.accent(a), Prefs.systemNight(a));
+                a.setTheme(Ui.themeStyle(Prefs.theme(a), Prefs.systemNight(a)));
             }
 
             @Override
             public void onActivityCreated(Activity a, Bundle b) {
                 AppLock.onActivityCreated(a);
+                if (!(a instanceof CameraActivity)) Ui.styleWindow(a);
             }
 
             @Override

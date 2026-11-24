@@ -50,6 +50,22 @@ final class Diag {
     }
 
     /** Notes a problem (failed save, camera error...). */
+    /** Error messages often name files: keep the type, drop the folders and names. */
+    static String scrub(String s) {
+        if (s == null) return null;
+        s = s.replaceAll("content://[^\\s\"')]+", "<link>");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(?:[^/\\n:\"'()]+/)+[^/\\n:\"'()]*").matcher(s);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            String path = m.group();
+            int dot = path.lastIndexOf('.');
+            String ext = dot > path.lastIndexOf('/') && path.length() - dot <= 6 ? path.substring(dot) : "";
+            m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement("<file" + ext + ">"));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
     static synchronized void log(String what, Throwable t) {
         if (dir == null) return;
         File f = new File(dir, "log.txt");
@@ -62,7 +78,7 @@ final class Diag {
                 f.renameTo(old);
             }
             try (FileWriter w = new FileWriter(f, true)) {
-                w.write(now() + "  " + what + (t != null ? ": " + t : "") + "\n");
+                w.write(now() + "  " + scrub(what + (t != null ? ": " + t : "")) + "\n");
                 if (t != null) {
                     StackTraceElement[] st = t.getStackTrace();
                     for (int i = 0; i < Math.min(6, st.length); i++) w.write("      at " + st[i] + "\n");

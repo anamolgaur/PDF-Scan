@@ -74,11 +74,35 @@ final class Prefs {
 
     /** AMOLED black look (true black, maroon and cream type) instead of the maroon ground. */
     static boolean amoled(Context c) {
-        return get(c).getBoolean("theme_amoled", false);
+        return "amoled".equals(theme(c));
+    }
+
+    /** auto, maroon, cream, white or amoled. Earlier versions had only an AMOLED switch. */
+    static String theme(Context c) {
+        String t = get(c).getString("theme", null);
+        if (t != null) return t;
+        return get(c).getBoolean("theme_amoled", false) ? "amoled" : "maroon";
+    }
+
+    static void setTheme(Context c, String t) {
+        get(c).edit().putString("theme", t).apply();
+    }
+
+    static String accent(Context c) {
+        return get(c).getString("accent", "vault");
+    }
+
+    static void setAccent(Context c, String a) {
+        get(c).edit().putString("accent", a).apply();
+    }
+
+    static boolean systemNight(Context c) {
+        return (c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
 
     static void setAmoled(Context c, boolean on) {
-        get(c).edit().putBoolean("theme_amoled", on).apply();
+        setTheme(c, on ? "amoled" : "maroon");
     }
 
     /** Find pages with the on-device neural network (the classic detector is always the backup). */

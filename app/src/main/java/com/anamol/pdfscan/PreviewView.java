@@ -63,7 +63,7 @@ final class PreviewView extends View {
         erasePaint.setColor(0x99F4EBDD);
         selectPaint.setStyle(Paint.Style.STROKE);
         selectPaint.setStrokeWidth(Ui.dp(c, 1));
-        selectPaint.setColor(Ui.MAROON);
+        selectPaint.setColor(Ui.ACCENT);
         selectPaint.setPathEffect(new DashPathEffect(new float[]{Ui.dp(c, 4), Ui.dp(c, 3)}, 0));
         scaler = new ScaleGestureDetector(c, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override

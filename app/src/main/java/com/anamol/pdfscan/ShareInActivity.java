@@ -61,7 +61,23 @@ public class ShareInActivity extends Activity {
         });
     }
 
+    /**
+     * Only content links from other apps. A file:// link, or one pointing back into this app,
+     * could otherwise make PDF Scan import its own private files.
+     */
+    private static boolean allowed(Uri u) {
+        if (u == null || !"content".equals(u.getScheme())) return false;
+        String auth = u.getAuthority();
+        return auth == null || !auth.startsWith("com.anamol.pdfscan");
+    }
+
     private static List<Uri> urisOf(Intent in) {
+        List<Uri> out = urisOfRaw(in);
+        out.removeIf(u -> !allowed(u));
+        return out;
+    }
+
+    private static List<Uri> urisOfRaw(Intent in) {
         List<Uri> out = new ArrayList<>();
         if (in == null) return out;
         String a = in.getAction();

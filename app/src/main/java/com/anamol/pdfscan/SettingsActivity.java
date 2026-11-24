@@ -38,20 +38,20 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
         page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         root.addView(Ui.section(this, "Appearance"));
-        Ui.chipRow(this, root, new String[]{"Maroon", "AMOLED black"}, Prefs.amoled(this) ? 1 : 0, i -> {
-            boolean black = i == 1;
-            if (black == Prefs.amoled(this)) return;
-            Prefs.setAmoled(this, black);
-            Ui.applyTheme(black);
-            // rebuild every screen in the new look, coming back here
-            startActivities(new android.content.Intent[]{
-                    new android.content.Intent(this, MainActivity.class).addFlags(
-                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK),
-                    new android.content.Intent(this, SettingsActivity.class)});
-            overridePendingTransition(0, 0);
+        root.addView(Ui.mono(this, "Theme"), Ui.full(this, 0));
+        Ui.chipRow(this, root, Ui.THEME_LABELS, Prefs.indexOf(Ui.THEMES, Prefs.theme(this)), i -> {
+            if (Ui.THEMES[i].equals(Prefs.theme(this))) return;
+            Prefs.setTheme(this, Ui.THEMES[i]);
+            restyle();
         });
-        root.addView(Ui.mono(this, "AMOLED black turns the background fully off on OLED screens: deep black with "
-                + "cream text and maroon accents. Saves battery at night."), Ui.full(this, 4));
+        root.addView(Ui.mono(this, "Auto is Cream by day and Maroon when your phone is in dark mode. "
+                + "AMOLED turns the background fully off on OLED screens."), Ui.full(this, 4));
+        root.addView(Ui.mono(this, "Accent"), Ui.full(this, 12));
+        Ui.chipRow(this, root, Ui.ACCENT_LABELS, Prefs.indexOf(Ui.ACCENTS, Prefs.accent(this)), i -> {
+            if (Ui.ACCENTS[i].equals(Prefs.accent(this))) return;
+            Prefs.setAccent(this, Ui.ACCENTS[i]);
+            restyle();
+        });
 
         root.addView(Ui.section(this, "Scanning"));
         root.addView(Ui.toggleWith(this, "Straighten and filter while capturing",
@@ -203,8 +203,8 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
         android.widget.SeekBar volBar = new android.widget.SeekBar(this);
         volBar.setMax(100);
         volBar.setProgress(Math.round(MusicPlayer.volume(this) * 100));
-        volBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.CREAM));
-        volBar.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.CREAM));
+        volBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        volBar.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
         volBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.LINE));
         volBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -289,6 +289,16 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
         if (driveStatus != null) driveStatus.setText(text != null ? text : "");
         refreshPhone();
         refreshTracks();
+    }
+
+    /** Rebuilds every screen in the new look, coming back here. */
+    private void restyle() {
+        Ui.applyTheme(Prefs.theme(this), Prefs.accent(this), Prefs.systemNight(this));
+        startActivities(new android.content.Intent[]{
+                new android.content.Intent(this, MainActivity.class).addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                new android.content.Intent(this, SettingsActivity.class)});
+        overridePendingTransition(0, 0);
     }
 
     private Switch toggle(String text, boolean on, CompoundButton.OnCheckedChangeListener l) {
@@ -558,13 +568,13 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
                     android.content.res.ColorStateList.valueOf(Ui.RIPPLE), null,
                     new android.graphics.drawable.ColorDrawable(0xFFFFFFFF)));
             android.widget.ImageView icon = new android.widget.ImageView(this);
-            icon.setImageDrawable(Ui.tinted(this, on ? R.drawable.ic_play : R.drawable.ic_music, on ? Ui.CREAM : Ui.MUTED));
+            icon.setImageDrawable(Ui.tinted(this, on ? R.drawable.ic_play : R.drawable.ic_music, on ? Ui.ACCENT : Ui.MUTED));
             row.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22)));
             LinearLayout text = new LinearLayout(this);
             text.setOrientation(LinearLayout.VERTICAL);
             TextView t = Ui.label(this, Soundtrack.TITLES[i]);
             t.setTextSize(15);
-            t.setTextColor(on ? Ui.CREAM : Ui.INK);
+            t.setTextColor(on ? Ui.ACCENT : Ui.INK);
             text.addView(t);
             text.addView(Ui.meta(this, Soundtrack.MOODS[i]), Ui.full(this, 2));
             LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);

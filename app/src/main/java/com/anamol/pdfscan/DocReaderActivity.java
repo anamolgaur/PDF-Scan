@@ -49,8 +49,13 @@ public class DocReaderActivity extends Activity implements PageSwiper.Source, Pa
     /** A document found on the phone (from the index). page is 0-based, or -1. */
     static Intent forPhone(Context c, long id, String path, String name, int page) {
         return new Intent(c, DocReaderActivity.class).putExtra(EXTRA_ID, id).putExtra(EXTRA_PATH, path)
-                .putExtra(EXTRA_NAME, name).putExtra(EXTRA_PAGE, page);
+                .putExtra(EXTRA_NAME, name).putExtra(EXTRA_PAGE, page).putExtra(EXTRA_TOKEN, TOKEN);
     }
+
+    // This screen also opens PDFs for other apps, so another app could start it with a made-up
+    // file path. Paths are only accepted with this token, which only this app's process knows.
+    private static final String EXTRA_TOKEN = "token";
+    private static final String TOKEN = java.util.UUID.randomUUID().toString();
 
     private long id = -1;
     private String path;
@@ -84,10 +89,13 @@ public class DocReaderActivity extends Activity implements PageSwiper.Source, Pa
         if (Intent.ACTION_VIEW.equals(in.getAction()) && in.getData() != null) {
             uri = in.getData();
             name = displayName(uri);
-        } else {
+        } else if (TOKEN.equals(in.getStringExtra(EXTRA_TOKEN))) {
             id = in.getLongExtra(EXTRA_ID, -1);
             path = in.getStringExtra(EXTRA_PATH);
             name = in.getStringExtra(EXTRA_NAME);
+        } else {
+            finish();
+            return;
         }
         if (name == null) name = path != null ? new File(path).getName() : "Document";
         pdf = OfficeText.extension(name).equals("pdf") || (uri != null && "application/pdf".equals(getContentResolver().getType(uri)));
@@ -196,7 +204,7 @@ public class DocReaderActivity extends Activity implements PageSwiper.Source, Pa
                 error = "This PDF is password-protected, so its pages can't be shown here.";
             } catch (IOException | RuntimeException e) {
                 error = "This PDF couldn't be opened: " + e.getMessage();
-                Diag.log("Reader: " + name, e);
+                Diag.log("Reader: ." + OfficeText.extension(name) + " file", e);
             }
             final String err = error;
             runOnUiThread(() -> {

@@ -315,7 +315,7 @@ public class MainActivity extends Activity implements StatusBus.Listener {
             label.setMinHeight(Ui.dp(this, 46));
             label.setSingleLine(true);
             View mark = new View(this);
-            mark.setBackground(Ui.box(this, Ui.CREAM, 0, 2));
+            mark.setBackground(Ui.box(this, Ui.ACCENT, 0, 2));
             LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 3));
             ml.setMargins(Ui.dp(this, 28), 0, Ui.dp(this, 28), 0);
             t.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -525,7 +525,7 @@ public class MainActivity extends Activity implements StatusBus.Listener {
             TextView ty = Ui.meta(this, type);
             ty.setSingleLine(true);
             ty.setEllipsize(TextUtils.TruncateAt.END);
-            ty.setTextColor(Ui.CREAM);
+            ty.setTextColor(Ui.INK);
             text.addView(ty, Ui.full(this, 4));
         }
         TextView m = Ui.meta(this, meta);
@@ -554,15 +554,15 @@ public class MainActivity extends Activity implements StatusBus.Listener {
         b.setTypeface(Ui.medium(this));
         b.setTextSize(ext.length() > 3 ? 9.5f : 10.5f);
         b.setLetterSpacing(0.06f);
-        b.setTextColor(Ui.CREAM);
+        b.setTextColor(Ui.INK);
         b.setGravity(Gravity.CENTER);
         b.setBackground(Ui.box(this, Ui.SURFACE, Ui.LINE, 4));
         return b;
     }
 
     private static void mark(Spannable s, int a, int b) {
-        s.setSpan(new ForegroundColorSpan(Ui.CREAM), a, b, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new BackgroundColorSpan(0x40F4EBDD), a, b, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new ForegroundColorSpan(Ui.INK), a, b, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new BackgroundColorSpan((Ui.INK & 0x00FFFFFF) | 0x40000000), a, b, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
     private static String statusNote(int status) {
