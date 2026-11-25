@@ -511,9 +511,11 @@ public class MainActivity extends Activity implements StatusBus.Listener {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(Ui.dp(this, 72));
-        row.setPadding(Ui.dp(this, 20), Ui.dp(this, 12), Ui.dp(this, 20), Ui.dp(this, 12));
-        row.addView(thumb, new LinearLayout.LayoutParams(Ui.dp(this, 46), Ui.dp(this, 61)));
+        // Compact lists (Settings > Appearance) use shorter rows and smaller covers
+        row.setMinimumHeight(Ui.dp(this, Ui.compact ? 56 : 72));
+        int vpad = Ui.dp(this, Ui.compact ? 6 : 12);
+        row.setPadding(Ui.dp(this, 20), vpad, Ui.dp(this, 20), vpad);
+        row.addView(thumb, new LinearLayout.LayoutParams(Ui.dp(this, Ui.compact ? 34 : 46), Ui.dp(this, Ui.compact ? 45 : 61)));
 
         LinearLayout text = new LinearLayout(this);
         text.setOrientation(LinearLayout.VERTICAL);

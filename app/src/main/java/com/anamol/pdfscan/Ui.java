@@ -55,8 +55,50 @@ final class Ui {
     static int RIPPLE_ON_ACCENT = 0x333A0200;
     static boolean amoled;
     static boolean light;
-    /** Corner radius for every panel, button, chip and field. */
-    static final int RADIUS = 8;
+    /**
+     * Corner radius (dp) for every panel, button, chip and field. Settings > Appearance > Corners
+     * sets it: Sharp = 2, Soft = 8 (Vault's default), Round = 16. It is read each time a shape is
+     * drawn, so screens built after a change pick it up.
+     */
+    static int RADIUS = 8;
+    /** Multiplies every text size Ui creates (Settings > Appearance > Text size). 1 = default. */
+    static float TEXT_SCALE = 1f;
+    /** Tighter list rows on the home screen (Settings > Appearance > Compact lists). */
+    static boolean compact;
+    /** Which typeface family the app uses: "dm" (DM Sans + Sora), "system", "serif" or "mono". */
+    static String fontFamily = "dm";
+
+    static final String[] TEXT_SIZES = {"small", "default", "large", "largest"};
+    static final String[] TEXT_SIZE_LABELS = {"Small", "Default", "Large", "Largest"};
+    private static final float[] TEXT_SCALES = {0.9f, 1f, 1.12f, 1.25f};
+    static final String[] FONTS = {"dm", "system", "serif", "mono"};
+    static final String[] FONT_LABELS = {"DM Sans", "System", "Serif", "Mono"};
+    static final String[] CORNERS = {"sharp", "soft", "round"};
+    static final String[] CORNER_LABELS = {"Sharp", "Soft", "Round"};
+    private static final int[] CORNER_DP = {2, 8, 16};
+
+    /**
+     * Applies the layout preferences (text size, font, corners, compact lists). Called together with
+     * applyTheme. The cached typefaces are dropped so the next screen loads the chosen family.
+     */
+    static void applyLayout(String textSize, String font, String corners, boolean compactLists) {
+        TEXT_SCALE = TEXT_SCALES[Math.max(0, java.util.Arrays.asList(TEXT_SIZES).indexOf(textSize))];
+        int ci = java.util.Arrays.asList(CORNERS).indexOf(corners);
+        RADIUS = CORNER_DP[ci < 0 ? 1 : ci];
+        compact = compactLists;
+        String f = java.util.Arrays.asList(FONTS).contains(font) ? font : "dm";
+        if (!f.equals(fontFamily)) {
+            fontFamily = f;
+            regular = null;
+            medium = null;
+            display = null;
+        }
+    }
+
+    /** A text size in sp, scaled by the user's text size choice. */
+    static float sp(float base) {
+        return base * TEXT_SCALE;
+    }
 
     static final String[] THEMES = {"auto", "maroon", "cream", "white", "amoled"};
     static final String[] THEME_LABELS = {"Auto", "Maroon", "Cream", "White", "AMOLED"};
@@ -173,18 +215,32 @@ final class Ui {
         }
     }
 
+    /**
+     * The family behind each text style. "dm" uses the bundled DM Sans for text and Sora for
+     * headings; the others use the phone's built-in families, which also cover every script.
+     */
+    private static Typeface family(int weight) {
+        switch (fontFamily) {
+            case "serif": return Typeface.create(Typeface.SERIF, weight >= 500 ? Typeface.BOLD : Typeface.NORMAL);
+            case "mono": return Typeface.create(Typeface.MONOSPACE, weight >= 600 ? Typeface.BOLD : Typeface.NORMAL);
+            default: return weight >= 600 ? Typeface.DEFAULT_BOLD
+                    : weight >= 500 ? Typeface.create("sans-serif-medium", Typeface.NORMAL) : Typeface.DEFAULT;
+        }
+    }
+
     static Typeface regular(Context c) {
-        if (regular == null) regular = font(c, R.font.dm_sans_regular, Typeface.DEFAULT);
+        if (regular == null) regular = fontFamily.equals("dm") ? font(c, R.font.dm_sans_regular, Typeface.DEFAULT) : family(400);
         return regular;
     }
 
     static Typeface medium(Context c) {
-        if (medium == null) medium = font(c, R.font.dm_sans_medium, Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        if (medium == null) medium = fontFamily.equals("dm")
+                ? font(c, R.font.dm_sans_medium, Typeface.create("sans-serif-medium", Typeface.NORMAL)) : family(500);
         return medium;
     }
 
     static Typeface display(Context c) {
-        if (display == null) display = font(c, R.font.sora_semibold, Typeface.DEFAULT_BOLD);
+        if (display == null) display = fontFamily.equals("dm") ? font(c, R.font.sora_semibold, Typeface.DEFAULT_BOLD) : family(600);
         return display;
     }
 
@@ -200,7 +256,7 @@ final class Ui {
         TextView t = new TextView(c);
         t.setText(s);
         t.setTypeface(tf);
-        t.setTextSize(sp);
+        t.setTextSize(sp(sp));
         t.setTextColor(color);
         t.setIncludeFontPadding(false);
         return t;
@@ -338,7 +394,7 @@ final class Ui {
         b.setText(text);
         b.setAllCaps(false);
         b.setTypeface(medium(c));
-        b.setTextSize(primary ? 16 : 15);
+        b.setTextSize(sp(primary ? 16 : 15));
         b.setTextColor(primary ? ON_ACCENT : INK);
         b.setElevation(0f);
         b.setStateListAnimator(null);
@@ -458,7 +514,7 @@ final class Ui {
         b.setText(text);
         b.setAllCaps(false);
         b.setTypeface(medium(c));
-        b.setTextSize(14);
+        b.setTextSize(sp(14));
         b.setElevation(0f);
         b.setStateListAnimator(null);
         b.setMinHeight(dp(c, 44));
@@ -599,14 +655,14 @@ final class Ui {
     static Switch toggle(Context c, String title, String description, boolean on) {
         Switch s = new Switch(c);
         s.setTypeface(regular(c));
-        s.setTextSize(15);
+        s.setTextSize(sp(15));
         s.setTextColor(INK);
         if (description != null) {
             android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(title);
             int start = sb.length();
             sb.append('\n').append(description);
             sb.setSpan(new android.text.style.ForegroundColorSpan(MUTED), start, sb.length(), 0);
-            sb.setSpan(new android.text.style.AbsoluteSizeSpan(13, true), start, sb.length(), 0);
+            sb.setSpan(new android.text.style.AbsoluteSizeSpan(Math.round(sp(13)), true), start, sb.length(), 0);
             s.setText(sb);
         } else {
             s.setText(title);
@@ -616,9 +672,9 @@ final class Ui {
         s.setPadding(0, dp(c, 8), 0, dp(c, 8));
         s.setSwitchPadding(dp(c, 16));
         s.setThumbTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}},
-                new int[]{CREAM, MUTED}));
+                new int[]{ON_ACCENT, MUTED}));
         s.setTrackTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}},
-                new int[]{0x99F4EBDD, LINE}));
+                new int[]{ACCENT, LINE}));
         s.setChecked(on);
         return s;
     }
@@ -768,5 +824,163 @@ final class Ui {
                 .setPositiveButton("Delete", (d, w) -> onYes.run())
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    // ------------------------------------------------------------------ settings building blocks
+    //
+    // Settings follow Vault's layout: small group titles in sentence case, and below each a
+    // "panel" (a raised surface with a hairline border and 8 dp corners) whose rows are separated
+    // by hairlines. Rows come in four kinds: a link to another page (icon, name, current state,
+    // chevron), a switch, a choice (name and current value, with the options wrapping below), and
+    // plain content (buttons, text, a meter).
+
+    /** Small sentence-case title above a panel. */
+    static TextView groupTitle(Context c, String s) {
+        TextView t = text(c, s, medium(c), 12.5f, MUTED);
+        t.setPadding(dp(c, 4), dp(c, 20), dp(c, 4), dp(c, 8));
+        return t;
+    }
+
+    /**
+     * A raised panel. add() puts a hairline between consecutive rows, so callers never manage
+     * separators themselves. Rows get 14 dp side padding to match the mockup.
+     */
+    static final class Panel extends LinearLayout {
+        Panel(Context c) {
+            super(c);
+            setOrientation(VERTICAL);
+            setBackground(box(c, SURFACE, LINE, RADIUS));
+            // keep ripples and children inside the rounded corners
+            setClipToOutline(true);
+            setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        }
+
+        /** Adds a row; a hairline goes above every row except the first visible one. */
+        Panel add(View row) {
+            if (getChildCount() > 0) {
+                View rule = new View(getContext());
+                rule.setBackgroundColor(LINE);
+                addView(rule, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+            }
+            addView(row, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return this;
+        }
+
+        /** Adds content that belongs to the previous row (e.g. the options under a choice), no rule. */
+        Panel attach(View v) {
+            addView(v, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return this;
+        }
+    }
+
+    /** Name over an optional muted one-liner; used inside every row kind. */
+    private static LinearLayout rowText(Context c, String title, String sub, TextView[] subOut) {
+        LinearLayout t = new LinearLayout(c);
+        t.setOrientation(LinearLayout.VERTICAL);
+        TextView name = text(c, title, medium(c), 15, INK);
+        name.setLineSpacing(0, 1.2f);
+        t.addView(name);
+        TextView s = text(c, sub == null ? "" : sub, regular(c), 13, MUTED);
+        s.setLineSpacing(0, 1.3f);
+        s.setPadding(0, dp(c, 3), 0, 0);
+        s.setVisibility(sub == null || sub.isEmpty() ? View.GONE : View.VISIBLE);
+        t.addView(s);
+        if (subOut != null) subOut[0] = s;
+        return t;
+    }
+
+    /**
+     * A row that opens another settings page: line icon, name, the current state underneath (so
+     * the main page reads as a summary), and a chevron. The returned holder lets the caller update
+     * the state text later (onResume) without rebuilding the row.
+     */
+    static TextView navRow(Context c, Panel panel, int icon, String title, View.OnClickListener click) {
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(c, 60));
+        row.setPadding(dp(c, 14), dp(c, 10), dp(c, 10), dp(c, 10));
+        row.setBackground(new RippleDrawable(ColorStateList.valueOf(RIPPLE), null, new ColorDrawable(0xFFFFFFFF)));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(click);
+        android.widget.ImageView iv = new android.widget.ImageView(c);
+        iv.setImageDrawable(tinted(c, icon, INK));
+        row.addView(iv, new LinearLayout.LayoutParams(dp(c, 20), dp(c, 20)));
+        TextView[] sub = new TextView[1];
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tl.setMarginStart(dp(c, 14));
+        tl.setMarginEnd(dp(c, 8));
+        row.addView(rowText(c, title, " ", sub), tl);
+        android.widget.ImageView chev = new android.widget.ImageView(c);
+        chev.setImageDrawable(tinted(c, R.drawable.ic_chevron, MUTED));
+        row.addView(chev, new LinearLayout.LayoutParams(dp(c, 18), dp(c, 18)));
+        row.setContentDescription(title);
+        panel.add(row);
+        return sub[0];
+    }
+
+    /** A switch row: name, a one-line explanation, the switch on the right. */
+    static Switch switchRow(Context c, Panel panel, String title, String sub, boolean on,
+                            android.widget.CompoundButton.OnCheckedChangeListener l) {
+        Switch s = toggleWith(c, title, sub, on, l);
+        s.setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 10));
+        s.setBackground(new RippleDrawable(ColorStateList.valueOf(RIPPLE), null, new ColorDrawable(0xFFFFFFFF)));
+        panel.add(s);
+        return s;
+    }
+
+    /**
+     * A choice: the name with the current value on the right, and the options below as chips that
+     * wrap onto new lines. Picking one updates the value text straight away.
+     */
+    static List<Button> choiceRow(Context c, Panel panel, String title, String[] labels, int selected, OnPick onPick) {
+        LinearLayout head = new LinearLayout(c);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setMinimumHeight(dp(c, 48));
+        head.setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 2));
+        head.addView(text(c, title, medium(c), 15, INK), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        final TextView value = text(c, selected >= 0 && selected < labels.length ? labels[selected] : "", regular(c), 13, MUTED);
+        value.setSingleLine(true);
+        head.addView(value);
+        panel.add(head);
+        LinearLayout holder = new LinearLayout(c);
+        holder.setOrientation(LinearLayout.VERTICAL);
+        holder.setPadding(dp(c, 14), 0, dp(c, 14), dp(c, 10));
+        List<Button> chips = chipRow(c, holder, labels, selected, i -> {
+            value.setText(labels[i]);
+            onPick.picked(i);
+        });
+        panel.attach(holder);
+        return chips;
+    }
+
+    /** Free content inside a panel (buttons, notes, meters), padded like a row. */
+    static void contentRow(Context c, Panel panel, View content) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12));
+        box.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        panel.add(box);
+    }
+
+    /** A note under a panel: muted, small, aligned with the group title. */
+    static TextView panelNote(Context c, String s) {
+        TextView t = text(c, s, regular(c), 12.5f, MUTED);
+        t.setLineSpacing(0, 1.4f);
+        t.setPadding(dp(c, 4), dp(c, 8), dp(c, 4), 0);
+        return t;
+    }
+
+    /** A thin horizontal meter (e.g. how much of the storage the original photos take). */
+    static android.widget.ProgressBar meter(Context c, float fraction) {
+        android.widget.ProgressBar p = new android.widget.ProgressBar(c, null, android.R.attr.progressBarStyleHorizontal);
+        p.setMax(1000);
+        p.setProgress(Math.round(Math.max(0, Math.min(1, fraction)) * 1000));
+        p.setProgressTintList(ColorStateList.valueOf(INK));
+        p.setProgressBackgroundTintList(ColorStateList.valueOf(LINE));
+        p.setMinimumHeight(dp(c, 6));
+        return p;
     }
 }

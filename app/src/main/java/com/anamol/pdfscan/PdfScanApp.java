@@ -13,6 +13,7 @@ public class PdfScanApp extends Application {
         super.onCreate();
         Diag.init(this);
         Ui.applyTheme(Prefs.theme(this), Prefs.accent(this), Prefs.systemNight(this));
+        Ui.applyLayout(Prefs.textSize(this), Prefs.font(this), Prefs.corners(this), Prefs.compact(this));
         PageModel.init(this);
         new Thread(() -> {
             DocStore store = new DocStore(this);
@@ -41,6 +42,7 @@ public class PdfScanApp extends Application {
                 if (a instanceof CameraActivity) return;
                 // Auto follows the phone's dark mode, which can change while the app is open
                 Ui.applyTheme(Prefs.theme(a), Prefs.accent(a), Prefs.systemNight(a));
+                Ui.applyLayout(Prefs.textSize(a), Prefs.font(a), Prefs.corners(a), Prefs.compact(a));
                 a.setTheme(Ui.themeStyle(Prefs.theme(a), Prefs.systemNight(a)));
             }
 

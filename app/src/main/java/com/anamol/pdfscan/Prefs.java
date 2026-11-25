@@ -96,6 +96,39 @@ final class Prefs {
         get(c).edit().putString("accent", a).apply();
     }
 
+    // Layout choices from Settings > Appearance > Text and layout (see Ui.applyLayout)
+    static String textSize(Context c) {
+        return get(c).getString("text_size", "default");
+    }
+
+    static void setTextSize(Context c, String v) {
+        get(c).edit().putString("text_size", v).apply();
+    }
+
+    static String font(Context c) {
+        return get(c).getString("font", "dm");
+    }
+
+    static void setFont(Context c, String v) {
+        get(c).edit().putString("font", v).apply();
+    }
+
+    static String corners(Context c) {
+        return get(c).getString("corners", "soft");
+    }
+
+    static void setCorners(Context c, String v) {
+        get(c).edit().putString("corners", v).apply();
+    }
+
+    static boolean compact(Context c) {
+        return get(c).getBoolean("compact_lists", false);
+    }
+
+    static void setCompact(Context c, boolean on) {
+        get(c).edit().putBoolean("compact_lists", on).apply();
+    }
+
     static boolean systemNight(Context c) {
         return (c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;

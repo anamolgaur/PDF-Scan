@@ -2,7 +2,9 @@ package com.anamol.pdfscan;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
@@ -10,81 +12,367 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 
-/** Scanning defaults, indexing, export size, and the optional internet / Google Drive link. */
+/**
+ * Settings, laid out like Vault's: a short main page of categories (each showing its current state
+ * underneath), and one page per category. Every page is this same activity, opened with
+ * EXTRA_PAGE naming the category; with no extra it shows the main page.
+ *
+ * Inside a page, settings sit in panels (see Ui.Panel): switches with a one-line explanation,
+ * choices with the current value on the right and the options wrapping below, and plain rows.
+ */
 public class SettingsActivity extends Activity implements StatusBus.Listener {
+    static final String EXTRA_PAGE = "page";
+    private static final String P_APPEARANCE = "appearance", P_SCANNING = "scanning", P_TEXT = "text",
+            P_EXPORT = "export", P_LIBRARY = "library", P_PHONE = "phone", P_DRIVE = "drive",
+            P_PRIVACY = "privacy", P_MUSIC = "music", P_ABOUT = "about";
+
     private LinearLayout driveBox;
     private LinearLayout phoneBox;
     private LinearLayout trackBox;
     private TextView driveStatus;
     private LinearLayout langBox;
     private TextView spaceLine;
+    private LinearLayout spaceMeterBox;
     private TextView binLine;
     private TextView diagLine;
+    private String page;
+    /** Main page: the state line under each category, refreshed in onResume. */
+    private final java.util.Map<String, TextView> summaries = new java.util.HashMap<>();
+    /** Main page: each category row's words, for the search box. */
+    private final java.util.Map<View, String> searchable = new java.util.LinkedHashMap<>();
     private static final int REQ_BACKUP = 61;
     private static final int REQ_RESTORE = 62;
     private static final int REQ_SAVE_MUSIC = 63;
 
+    static android.content.Intent open(android.content.Context c, String page) {
+        return new android.content.Intent(c, SettingsActivity.class).putExtra(EXTRA_PAGE, page);
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout page = Ui.bare(this);
-        page.addView(Ui.topBar(this, this::finish, Ui.title(this, "Settings")));
+        page = getIntent().getStringExtra(EXTRA_PAGE);
+        LinearLayout screen = Ui.bare(this);
+        screen.addView(Ui.topBar(this, this::finish, Ui.title(this, titleOf(page))));
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), Ui.dp(this, 32));
+        root.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), Ui.dp(this, 32));
         scroll.addView(root);
-        page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        screen.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        root.addView(Ui.section(this, "Appearance"));
-        root.addView(Ui.mono(this, "Theme"), Ui.full(this, 0));
-        Ui.chipRow(this, root, Ui.THEME_LABELS, Prefs.indexOf(Ui.THEMES, Prefs.theme(this)), i -> {
-            if (Ui.THEMES[i].equals(Prefs.theme(this))) return;
-            Prefs.setTheme(this, Ui.THEMES[i]);
+        if (page == null) buildHome(root);
+        else if (page.equals(P_APPEARANCE)) buildAppearance(root);
+        else if (page.equals(P_SCANNING)) buildScanning(root);
+        else if (page.equals(P_TEXT)) buildText(root);
+        else if (page.equals(P_EXPORT)) buildExport(root);
+        else if (page.equals(P_LIBRARY)) buildLibrary(root);
+        else if (page.equals(P_PHONE)) buildPhone(root);
+        else if (page.equals(P_DRIVE)) buildDrive(root);
+        else if (page.equals(P_PRIVACY)) buildPrivacy(root);
+        else if (page.equals(P_MUSIC)) buildMusic(root);
+        else buildAbout(root);
+
+        setContentView(screen);
+        refreshDrive();
+        refreshPhone();
+    }
+
+    private static String titleOf(String p) {
+        if (p == null) return "Settings";
+        switch (p) {
+            case P_APPEARANCE: return "Appearance";
+            case P_SCANNING: return "Scanning";
+            case P_TEXT: return "Text recognition";
+            case P_EXPORT: return "Export";
+            case P_LIBRARY: return "Library and storage";
+            case P_PHONE: return "Phone search";
+            case P_DRIVE: return "Google Drive";
+            case P_PRIVACY: return "Lock and privacy";
+            case P_MUSIC: return "Music";
+            default: return "About and help";
+        }
+    }
+
+    /** Adds a panel to the page under an optional group title, and returns it for rows. */
+    private Ui.Panel panel(LinearLayout root, String title) {
+        if (title != null) root.addView(Ui.groupTitle(this, title));
+        Ui.Panel p = new Ui.Panel(this);
+        root.addView(p, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return p;
+    }
+
+    // ------------------------------------------------------------------ main page
+
+    private void buildHome(LinearLayout root) {
+        // Search: hides category rows whose words don't match, and whole groups left empty.
+        EditText search = Ui.searchField(this, "Search settings");
+        LinearLayout.LayoutParams sl = Ui.full(this, 4);
+        sl.bottomMargin = Ui.dp(this, 4);
+        root.addView(search, sl);
+
+        Ui.Panel general = panel(root, "General");
+        nav(general, P_APPEARANCE, R.drawable.ic_palette, "theme accent colour dark light amoled text size font corners compact");
+        nav(general, P_SCANNING, R.drawable.ic_frame, "camera auto capture smart page finding ai straighten filter photo scan id qr");
+        nav(general, P_TEXT, R.drawable.ic_text, "ocr languages hindi english handwriting recognise");
+        nav(general, P_EXPORT, R.drawable.ic_export, "pdf size quality small balanced");
+        Ui.Panel docs = panel(root, "Your documents");
+        nav(docs, P_LIBRARY, R.drawable.ic_folder, "backup restore recycle bin trash storage space original photos");
+        nav(docs, P_PHONE, R.drawable.ic_search, "phone files index word excel powerpoint search");
+        if (DriveAccount.configured()) nav(docs, P_DRIVE, R.drawable.ic_cloud, "google drive upload sync cloud");
+        Ui.Panel privacy = panel(root, "Privacy");
+        nav(privacy, P_PRIVACY, R.drawable.ic_lock, "lock fingerprint pin recent screenshots internet network");
+        Ui.Panel more = panel(root, "More");
+        nav(more, P_MUSIC, R.drawable.ic_music, "music soundtrack volume tracks");
+        nav(more, P_ABOUT, R.drawable.ic_info, "about version licence diagnostics crash report help");
+
+        final Ui.Panel[] panels = {general, docs, privacy, more};
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                String q = e.toString().trim().toLowerCase(java.util.Locale.ROOT);
+                for (java.util.Map.Entry<View, String> en : searchable.entrySet()) {
+                    en.getKey().setVisibility(q.isEmpty() || en.getValue().contains(q) ? View.VISIBLE : View.GONE);
+                }
+                // a panel's rules sit between rows: show a rule only when a visible row follows a
+                // visible row, and hide a group whose rows are all hidden
+                for (Ui.Panel p : panels) {
+                    boolean any = false;
+                    View lastRule = null;
+                    for (int i = 0; i < p.getChildCount(); i++) {
+                        View ch = p.getChildAt(i);
+                        if (!searchable.containsKey(ch)) {
+                            lastRule = ch;
+                            ch.setVisibility(View.GONE);
+                            continue;
+                        }
+                        if (ch.getVisibility() == View.VISIBLE) {
+                            if (any && lastRule != null) lastRule.setVisibility(View.VISIBLE);
+                            any = true;
+                        }
+                    }
+                    p.setVisibility(any ? View.VISIBLE : View.GONE);
+                    int idx = root.indexOfChild(p);
+                    if (idx > 0) root.getChildAt(idx - 1).setVisibility(any ? View.VISIBLE : View.GONE);
+                }
+            }
+        });
+    }
+
+    private void nav(Ui.Panel panel, String p, int icon, String keywords) {
+        String title = titleOf(p);
+        TextView sub = Ui.navRow(this, panel, icon, title, v -> startActivity(open(this, p)));
+        summaries.put(p, sub);
+        searchable.put(panel.getChildAt(panel.getChildCount() - 1), (title + " " + keywords).toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** The one-line state under each category on the main page. */
+    private void refreshSummaries() {
+        if (summaries.isEmpty()) return;
+        set(P_APPEARANCE, Ui.THEME_LABELS[Math.max(0, Prefs.indexOf(Ui.THEMES, Prefs.theme(this)))] + ", "
+                + Ui.ACCENT_LABELS[Math.max(0, Prefs.indexOf(Ui.ACCENTS, Prefs.accent(this)))] + " accent");
+        set(P_SCANNING, "Auto capture " + (Prefs.autoCapture(this) ? "on" : "off")
+                + ", smart page finding " + (Prefs.smartDetect(this) ? "on" : "off"));
+        set(P_TEXT, String.join(", ", Languages.activeNames(this)));
+        set(P_EXPORT, Prefs.SIZE_LABELS[Math.max(0, Prefs.indexOf(Prefs.SIZES, Prefs.exportSize(this)))] + ", searchable PDF");
+        int keep = Prefs.keepOriginalsDays(this);
+        final String keepText = keep == 0 ? "originals kept" : "originals kept " + keep + " days";
+        set(P_LIBRARY, keepText);
+        Ui.task(this, () -> {
+            long[] r = new DocStore(this).spaceUsed();
+            runOnUiThread(() -> set(P_LIBRARY, MainActivity.size(r[0]) + " used, " + keepText));
+        }, null, null);
+        set(P_PHONE, PhoneFiles.enabled(this) ? "On" : "Off");
+        set(P_DRIVE, DriveAccount.connected(this) ? "Connected" : "Not connected");
+        set(P_PRIVACY, "App lock " + (AppLock.appLockOn(this) ? "on" : "off")
+                + ", internet " + (Prefs.internet(this) ? "on" : "off"));
+        set(P_MUSIC, MusicPlayer.enabled(this) ? "On, " + Soundtrack.TITLES[Math.max(0, Math.min(Soundtrack.count() - 1,
+                MusicService.currentTrack() >= 0 ? MusicService.currentTrack() : MusicPlayer.track(this)))] : "Off");
+        set(P_ABOUT, "Version " + BuildConfig.VERSION_NAME + ", licences, diagnostics");
+    }
+
+    private void set(String p, String text) {
+        TextView t = summaries.get(p);
+        if (t != null) {
+            t.setText(text);
+            t.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // ------------------------------------------------------------------ appearance
+
+    private void buildAppearance(LinearLayout root) {
+        // Theme: one small preview tile per theme ("Aa" in its ink on its paper)
+        Ui.Panel themes = panel(root, "Theme");
+        LinearLayout tiles = new LinearLayout(this);
+        tiles.setOrientation(LinearLayout.HORIZONTAL);
+        tiles.setPadding(Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12));
+        int[][] look = {{0, 0}, {0xFF3A0200, 0xFFF4EBDD}, {0xFFF7F1E6, 0xFF6B0A0A}, {0xFFFFFFFF, 0xFF6B0A0A}, {0xFF000000, 0xFFEDEDED}};
+        String current = Prefs.theme(this);
+        for (int i = 0; i < Ui.THEMES.length; i++) {
+            final String t = Ui.THEMES[i];
+            LinearLayout cell = new LinearLayout(this);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+            cell.setPadding(Ui.dp(this, 5), Ui.dp(this, 5), Ui.dp(this, 5), Ui.dp(this, 6));
+            boolean sel = t.equals(current);
+            android.graphics.drawable.GradientDrawable frame = Ui.box(this, 0x00000000, sel ? Ui.INK : Ui.LINE, Ui.RADIUS);
+            if (sel) frame.setStroke(Ui.dp(this, 2), Ui.INK);
+            cell.setBackground(frame);
+            TextView chip = new TextView(this);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setTypeface(Ui.display(this));
+            chip.setTextSize(Ui.sp(14));
+            if (i == 0) {
+                // Auto: half cream, half maroon
+                android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{0xFFF7F1E6, 0xFF3A0200});
+                g.setCornerRadius(Ui.dp(this, Math.max(2, Ui.RADIUS - 2)));
+                chip.setBackground(g);
+            } else {
+                chip.setText("Aa");
+                chip.setTextColor(look[i][1]);
+                chip.setBackground(Ui.box(this, look[i][0], Ui.LINE, Math.max(2, Ui.RADIUS - 2)));
+            }
+            cell.addView(chip, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 44)));
+            TextView name = Ui.meta(this, Ui.THEME_LABELS[i]);
+            name.setTextColor(Ui.INK);
+            name.setSingleLine(true);
+            name.setPadding(0, Ui.dp(this, 6), 0, 0);
+            cell.addView(name);
+            cell.setContentDescription(Ui.THEME_LABELS[i] + " theme" + (sel ? ", selected" : ""));
+            cell.setOnClickListener(v -> {
+                if (t.equals(Prefs.theme(this))) return;
+                Prefs.setTheme(this, t);
+                restyle();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            lp.setMargins(Ui.dp(this, 3), 0, Ui.dp(this, 3), 0);
+            tiles.addView(cell, lp);
+        }
+        themes.add(tiles);
+        root.addView(Ui.panelNote(this, "Auto uses Cream by day and Maroon when your phone is in dark mode. "
+                + "AMOLED turns the background fully off on OLED screens."));
+
+        // Accent: colour dots, the selected one ringed; the name shows on the right
+        Ui.Panel accents = panel(root, "Accent");
+        Ui.Flow dots = new Ui.Flow(this, Ui.dp(this, 10), Ui.dp(this, 10));
+        dots.setPadding(Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 12));
+        int[] colors = {Ui.INK, 0xFF7A1C1C, 0xFFC62828, 0xFFD2561E, 0xFFC9971C, 0xFF2E7D4F, 0xFF2F5FA8, 0xFF6A4BAE};
+        String acc = Prefs.accent(this);
+        for (int i = 0; i < Ui.ACCENTS.length; i++) {
+            final String a = Ui.ACCENTS[i];
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            g.setColor(colors[i]);
+            boolean sel = a.equals(acc);
+            g.setStroke(Ui.dp(this, sel ? 3 : 1), sel ? Ui.BG : Ui.LINE);
+            // the ring around the selected dot: an outer oval in the ink colour
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+            ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            ring.setColor(sel ? Ui.INK : 0x00000000);
+            dot.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{ring,
+                    new android.graphics.drawable.InsetDrawable(g, Ui.dp(this, 2))}));
+            dot.setContentDescription(Ui.ACCENT_LABELS[i] + " accent" + (sel ? ", selected" : ""));
+            dot.setOnClickListener(v -> {
+                if (a.equals(Prefs.accent(this))) return;
+                Prefs.setAccent(this, a);
+                restyle();
+            });
+            dots.addView(dot, new ViewGroup.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
+        }
+        accents.add(dots);
+        LinearLayout accRow = new LinearLayout(this);
+        accRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        accRow.addView(Ui.label(this, "Accent"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        accRow.addView(Ui.meta(this, Ui.ACCENT_LABELS[Math.max(0, Prefs.indexOf(Ui.ACCENTS, acc))]));
+        Ui.contentRow(this, accents, accRow);
+
+        // Text and layout: each change rebuilds the screens so it shows everywhere at once
+        Ui.Panel layout = panel(root, "Text and layout");
+        Ui.choiceRow(this, layout, "Text size", Ui.TEXT_SIZE_LABELS, Math.max(0, Prefs.indexOf(Ui.TEXT_SIZES, Prefs.textSize(this))), i -> {
+            Prefs.setTextSize(this, Ui.TEXT_SIZES[i]);
             restyle();
         });
-        root.addView(Ui.mono(this, "Auto is Cream by day and Maroon when your phone is in dark mode. "
-                + "AMOLED turns the background fully off on OLED screens."), Ui.full(this, 4));
-        root.addView(Ui.mono(this, "Accent"), Ui.full(this, 12));
-        Ui.chipRow(this, root, Ui.ACCENT_LABELS, Prefs.indexOf(Ui.ACCENTS, Prefs.accent(this)), i -> {
-            if (Ui.ACCENTS[i].equals(Prefs.accent(this))) return;
-            Prefs.setAccent(this, Ui.ACCENTS[i]);
+        Ui.choiceRow(this, layout, "Font", Ui.FONT_LABELS, Math.max(0, Prefs.indexOf(Ui.FONTS, Prefs.font(this))), i -> {
+            Prefs.setFont(this, Ui.FONTS[i]);
             restyle();
         });
+        Ui.choiceRow(this, layout, "Corners", Ui.CORNER_LABELS, Math.max(0, Prefs.indexOf(Ui.CORNERS, Prefs.corners(this))), i -> {
+            Prefs.setCorners(this, Ui.CORNERS[i]);
+            restyle();
+        });
+        Ui.switchRow(this, layout, "Compact lists", "Fit more documents on the home screen", Prefs.compact(this), (b, on) -> {
+            Prefs.setCompact(this, on);
+            Ui.applyLayout(Prefs.textSize(this), Prefs.font(this), Prefs.corners(this), on);
+        });
+        root.addView(Ui.panelNote(this, "System, Serif and Mono use your phone's own fonts, which also cover every language."));
+    }
 
-        root.addView(Ui.section(this, "Scanning"));
-        root.addView(Ui.toggleWith(this, "Straighten and filter while capturing",
-                "Off: the camera takes plain photos. Crop, filter and mark them up afterwards from the page preview.",
-                Prefs.scanOnCapture(this), (b, on) -> Prefs.setScanOnCapture(this, on)));
-        root.addView(Ui.mono(this, "Filter for scanned and imported pages"), Ui.full(this, 8));
-        Ui.chipRow(this, root, ImageOps.FILTER_LABELS, Prefs.indexOf(ImageOps.FILTERS, Prefs.defaultFilter(this)),
+    // ------------------------------------------------------------------ scanning
+
+    private void buildScanning(LinearLayout root) {
+        Ui.Panel camera = panel(root, "Camera");
+        Ui.switchRow(this, camera, "Capture automatically", "Takes the photo when the page is steady",
+                Prefs.autoCapture(this), (b, on) -> Prefs.setAutoCapture(this, on));
+        Ui.switchRow(this, camera, "Smart page finding", "On-device AI finds the corners. Nothing is sent anywhere",
+                Prefs.smartDetect(this), (b, on) -> Prefs.setSmartDetect(this, on));
+        Ui.switchRow(this, camera, "Straighten while capturing", "Off: plain photos, crop and filter later",
+                Prefs.scanOnCapture(this), (b, on) -> Prefs.setScanOnCapture(this, on));
+        String[] modes = {"Photo", "Scan", "ID card", "QR"};
+        int[] modeIds = {Prefs.CAMERA_PHOTO, Prefs.CAMERA_SCAN, Prefs.CAMERA_ID, Prefs.CAMERA_QR};
+        int cur = 0;
+        for (int i = 0; i < modeIds.length; i++) if (modeIds[i] == Prefs.cameraMode(this)) cur = i;
+        Ui.choiceRow(this, camera, "Camera opens in", modes, cur, i -> Prefs.setCameraMode(this, modeIds[i]));
+
+        Ui.Panel pages = panel(root, "New pages");
+        Ui.choiceRow(this, pages, "Filter", ImageOps.FILTER_LABELS,
+                Math.max(0, Prefs.indexOf(ImageOps.FILTERS, Prefs.defaultFilter(this))),
                 i -> Prefs.setDefaultFilter(this, ImageOps.FILTERS[i]));
-        root.addView(toggle("Capture automatically when a page is steady", Prefs.autoCapture(this),
-                (b, on) -> Prefs.setAutoCapture(this, on)), Ui.full(this, 8));
-        root.addView(Ui.toggleWith(this, "Smart page finding",
-                "A small AI model on the phone finds the page's corners, even on cluttered or white desks. "
-                        + "Nothing is sent anywhere. When it's unsure, or this is off, the classic detector is used.",
-                Prefs.smartDetect(this), (b, on) -> Prefs.setSmartDetect(this, on)), Ui.full(this, 8));
+        Ui.switchRow(this, pages, "Recognise text in the background", "Makes new scans searchable. Runs on this phone",
+                Indexer.autoEnabled(this), (b, on) -> Indexer.setAutoEnabled(this, on));
+    }
 
-        root.addView(Ui.section(this, "Text"));
-        root.addView(toggle("Recognise text in the background", Indexer.autoEnabled(this),
-                (b, on) -> Indexer.setAutoEnabled(this, on)));
-        root.addView(Ui.mono(this, "Needed for search and searchable PDFs. Runs on this phone."), Ui.full(this, 2));
-        root.addView(Ui.mono(this, "Languages"), Ui.full(this, 14));
+    // ------------------------------------------------------------------ text recognition
+
+    private void buildText(LinearLayout root) {
+        Ui.Panel p = panel(root, "Languages");
         langBox = new LinearLayout(this);
         langBox.setOrientation(LinearLayout.VERTICAL);
-        root.addView(langBox, Ui.full(this, 2));
+        Ui.contentRow(this, p, langBox);
         refreshLanguages();
+        root.addView(Ui.panelNote(this, "Indian languages, Chinese, Japanese, Korean and European languages are "
+                + "one-time downloads. Higher-accuracy English for handwriting is in Choose languages."));
+    }
 
-        root.addView(Ui.section(this, "Library"));
+    // ------------------------------------------------------------------ export
+
+    private void buildExport(LinearLayout root) {
+        Ui.Panel p = panel(root, "PDF");
+        Ui.choiceRow(this, p, "Size", Prefs.SIZE_LABELS, Math.max(0, Prefs.indexOf(Prefs.SIZES, Prefs.exportSize(this))),
+                i -> Prefs.setExportSize(this, Prefs.SIZES[i]));
+        root.addView(Ui.panelNote(this, "High quality keeps your pages as they are. Balanced and Small make smaller "
+                + "files; Small stores black-and-white pages as crisp 1-bit images. Every PDF has a searchable text layer."));
+    }
+
+    // ------------------------------------------------------------------ library and storage
+
+    private void buildLibrary(LinearLayout root) {
+        Ui.Panel lib = panel(root, "Library");
         binLine = Ui.label(this, "");
-        binLine.setMinHeight(Ui.dp(this, 48));
-        binLine.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        binLine.setOnClickListener(v -> startActivity(new android.content.Intent(this, TrashActivity.class)));
-        root.addView(binLine);
-        root.addView(Ui.mono(this, "Back up every scan, with its text, folders and your saved signatures, to one file. "
-                + "Restoring adds the documents back; nothing in the app is replaced."), Ui.full(this, 6));
+        TextView bin = Ui.navRow(this, lib, R.drawable.ic_trash, "Recycle bin",
+                v -> startActivity(new android.content.Intent(this, TrashActivity.class)));
+        binLine = bin;
         Button backup = Ui.button(this, "Back up", false);
         Button restore = Ui.button(this, "Restore", false);
         backup.setOnClickListener(v -> {
@@ -104,19 +392,29 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
                     .putExtra(android.content.Intent.EXTRA_MIME_TYPES, new String[]{"application/zip",
                             "application/x-zip-compressed", "application/octet-stream"}), REQ_RESTORE);
         });
-        root.addView(Ui.row(this, backup, restore), Ui.full(this, 8));
+        LinearLayout backupBox = new LinearLayout(this);
+        backupBox.setOrientation(LinearLayout.VERTICAL);
+        backupBox.addView(Ui.label(this, "Backup"));
+        TextView bsub = Ui.meta(this, "Every scan, its text, folders and your saved signatures in one file. "
+                + "Restoring adds documents back; nothing is replaced.");
+        backupBox.addView(bsub, Ui.full(this, 3));
+        backupBox.addView(Ui.row(this, backup, restore), Ui.full(this, 10));
+        Ui.contentRow(this, lib, backupBox);
 
-        root.addView(Ui.mono(this, "Original photos"), Ui.full(this, 16));
+        Ui.Panel storage = panel(root, "Storage");
+        LinearLayout space = new LinearLayout(this);
+        space.setOrientation(LinearLayout.VERTICAL);
+        space.addView(Ui.label(this, "Original photos"));
         spaceLine = Ui.meta(this, "");
-        root.addView(spaceLine, Ui.full(this, 2));
+        space.addView(spaceLine, Ui.full(this, 3));
+        spaceMeterBox = new LinearLayout(this);
+        space.addView(spaceMeterBox, Ui.full(this, 8));
+        Ui.contentRow(this, storage, space);
         int[] keepDays = {0, 30, 90};
         int keepIdx = 0;
         for (int i = 0; i < keepDays.length; i++) if (keepDays[i] == Prefs.keepOriginalsDays(this)) keepIdx = i;
-        Ui.chipRow(this, root, new String[]{"Keep always", "Remove after 30 days", "Remove after 90 days"}, keepIdx,
+        Ui.choiceRow(this, storage, "Keep originals", new String[]{"Always", "30 days", "90 days"}, keepIdx,
                 i -> Prefs.setKeepOriginalsDays(this, keepDays[i]));
-        root.addView(Ui.mono(this, "Each page keeps its original photo so crop and filters can be redone. "
-                + "Removing old ones saves space; those pages can still be edited, starting from the finished page."),
-                Ui.full(this, 4));
         Button freeUp = Ui.button(this, "Free up space now", false);
         freeUp.setOnClickListener(v -> Ui.confirm(this, "Remove the original photos of every page? Pages stay as they "
                 + "are now and can still be edited, but crop and filter changes can't be undone back to the photo.", () -> {
@@ -126,79 +424,87 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
                         refreshSpace();
                     }, null);
                 }));
-        root.addView(freeUp, Ui.full(this, 8));
+        LinearLayout fb = new LinearLayout(this);
+        fb.addView(freeUp);
+        Ui.contentRow(this, storage, fb);
+        root.addView(Ui.panelNote(this, "Each page keeps its original photo so crop and filters can be redone. "
+                + "Removing old ones saves space; those pages can still be edited, starting from the finished page."));
+    }
 
-        root.addView(Ui.section(this, "Privacy"));
-        root.addView(Ui.toggleWith(this, "Lock the app",
-                "Unlock with your fingerprint, face or screen lock each time you open PDF Scan. "
-                        + "Folders can also be locked on their own: long-press a folder on the home screen.",
+    // ------------------------------------------------------------------ phone search
+
+    private void buildPhone(LinearLayout root) {
+        Ui.Panel p = panel(root, null);
+        Ui.switchRow(this, p, "Make documents on this phone searchable",
+                "PDF, Word, Excel, PowerPoint, OpenDocument, RTF and text files. Only their text is kept, privately",
+                PhoneFiles.enabled(this), (b, on) -> {
+                    if (on) {
+                        b.setChecked(false);
+                        explainPhoneIndex(b);
+                    } else {
+                        PhoneFiles.setEnabled(this, false);
+                        FileIndexService.stop(this);
+                        refreshPhone();
+                    }
+                });
+        phoneBox = new LinearLayout(this);
+        phoneBox.setOrientation(LinearLayout.VERTICAL);
+        Ui.contentRow(this, p, phoneBox);
+    }
+
+    // ------------------------------------------------------------------ google drive
+
+    private void buildDrive(LinearLayout root) {
+        Ui.Panel p = panel(root, null);
+        driveBox = new LinearLayout(this);
+        driveBox.setOrientation(LinearLayout.VERTICAL);
+        Ui.contentRow(this, p, driveBox);
+        root.addView(Ui.panelNote(this, "Google Drive needs internet access, which you can turn on in Lock and privacy."));
+    }
+
+    // ------------------------------------------------------------------ lock and privacy
+
+    private void buildPrivacy(LinearLayout root) {
+        Ui.Panel lock = panel(root, "Lock");
+        Ui.switchRow(this, lock, "Lock the app",
+                "Fingerprint, face or screen lock each time you open PDF Scan. Lock single folders by long-pressing them",
                 AppLock.appLockOn(this), (b, on) -> {
                     if (on == AppLock.appLockOn(this)) return;
                     AppLock.authenticate(this, on ? "Turn on the app lock" : "Turn off the app lock", null,
                             () -> AppLock.setAppLock(this, on), () -> b.setChecked(!on));
-                }));
-        root.addView(Ui.toggleWith(this, "Hide from recent apps and screenshots",
-                "The app's screens show blank in the recent-apps view and can't be captured.",
+                });
+        Ui.switchRow(this, lock, "Hide from recent apps and screenshots",
+                "Screens show blank in recent apps and can't be captured",
                 AppLock.secureScreens(this), (b, on) -> {
                     AppLock.setSecureScreens(this, on);
                     if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
                     else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
                     Ui.toast(this, "Applies to every screen from now on");
-                }));
+                });
+        Ui.Panel net = panel(root, "Internet");
+        Ui.switchRow(this, net, "Allow internet access", DriveAccount.configured()
+                        ? "Off: the app never connects to anything. On: only for Google Drive and language downloads"
+                        : "Off: the app never connects to anything. On: only for language downloads",
+                Prefs.internet(this), (b, on) -> Prefs.setInternet(this, on));
+        root.addView(Ui.panelNote(this, "No ads, no analytics, no crash uploads. Your scans stay on this phone "
+                + "unless you export or upload them."));
+    }
 
-        root.addView(Ui.section(this, "Export"));
-        root.addView(Ui.mono(this, "PDF size"));
-        Ui.chipRow(this, root, Prefs.SIZE_LABELS, Prefs.indexOf(Prefs.SIZES, Prefs.exportSize(this)),
-                i -> Prefs.setExportSize(this, Prefs.SIZES[i]));
+    // ------------------------------------------------------------------ music
 
-        root.addView(Ui.section(this, DriveAccount.configured() ? "Internet and Google Drive" : "Internet"));
-        root.addView(toggle("Allow internet access", Prefs.internet(this), (b, on) -> {
-            Prefs.setInternet(this, on);
-            refreshDrive();
-        }));
-        root.addView(Ui.mono(this, DriveAccount.configured()
-                ? "Off: the app never connects to anything. On: used only for Google Drive, when you connect it, "
-                + "and for downloading text languages."
-                : "Off: the app never connects to anything. On: used only for downloading text languages."),
-                Ui.full(this, 2));
-        driveBox = new LinearLayout(this);
-        driveBox.setOrientation(LinearLayout.VERTICAL);
-        root.addView(driveBox, Ui.full(this, 8));
-
-        root.addView(Ui.section(this, "Phone files"));
-        root.addView(toggle("Make documents on this phone searchable", PhoneFiles.enabled(this), (b, on) -> {
-            if (on) {
-                b.setChecked(false);
-                explainPhoneIndex(b);
-            } else {
-                PhoneFiles.setEnabled(this, false);
-                FileIndexService.stop(this);
-                refreshPhone();
-            }
-        }));
-        root.addView(Ui.mono(this, "Reads PDF, Word, Excel, PowerPoint, OpenDocument, RTF and text files so "
-                + "library search finds them. Only their text is kept, privately on this phone."), Ui.full(this, 2));
-        phoneBox = new LinearLayout(this);
-        phoneBox.setOrientation(LinearLayout.VERTICAL);
-        root.addView(phoneBox, Ui.full(this, 8));
-
-        root.addView(Ui.section(this, "Music"));
-        root.addView(toggle("Background music", MusicPlayer.enabled(this),
-                (b, on) -> MusicPlayer.setEnabled(this, on)));
-        root.addView(Ui.toggleWith(this, "Keep playing after leaving the app",
-                "Off: the music pauses when you leave and continues from the same spot when you come back. "
-                        + "It keeps playing while you use the camera, pick files or open a document.",
-                MusicPlayer.keepPlaying(this),
-                (b, on) -> MusicPlayer.setKeepPlaying(this, on)));
-        root.addView(Ui.toggleWith(this, "Play the whole journey",
-                "Eight tracks in order, from the puzzle loop down into the castle and back, with crossfades. "
-                        + "Off: repeat the chosen track", MusicPlayer.playAll(this),
-                (b, on) -> MusicPlayer.setPlayAll(this, on)));
-
+    private void buildMusic(LinearLayout root) {
+        Ui.Panel play = panel(root, "Playback");
+        Ui.switchRow(this, play, "Background music", "Sixteen original tracks, 8-bit and gothic",
+                MusicPlayer.enabled(this), (b, on) -> MusicPlayer.setEnabled(this, on));
+        Ui.switchRow(this, play, "Keep playing after leaving the app",
+                "Off: pauses when you leave and carries on from the same spot",
+                MusicPlayer.keepPlaying(this), (b, on) -> MusicPlayer.setKeepPlaying(this, on));
+        Ui.switchRow(this, play, "Play the whole journey", "Off: repeat the chosen track",
+                MusicPlayer.playAll(this), (b, on) -> MusicPlayer.setPlayAll(this, on));
         LinearLayout vol = new LinearLayout(this);
         vol.setOrientation(LinearLayout.HORIZONTAL);
         vol.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        TextView volLabel = Ui.body(this, "Volume", false);
+        TextView volLabel = Ui.label(this, "Volume");
         volLabel.setMinWidth(Ui.dp(this, 76));
         android.widget.SeekBar volBar = new android.widget.SeekBar(this);
         volBar.setMax(100);
@@ -221,29 +527,43 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
             }
         });
         vol.addView(volLabel);
-        vol.addView(volBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1f));
-        root.addView(vol, Ui.full(this, 4));
+        vol.addView(volBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1f));
+        Ui.contentRow(this, play, vol);
 
-        root.addView(Ui.meta(this, "TRACKS"), Ui.full(this, 14));
-        int opens = MusicPlayer.opens(this);
-        root.addView(Ui.meta(this, "Opened " + opens + (opens == 1 ? " time" : " times")
-                + " \u00B7 the soundtrack carries on from where it stopped last time"), Ui.full(this, 2));
+        Ui.Panel tracks = panel(root, "Tracks");
         trackBox = new LinearLayout(this);
         trackBox.setOrientation(LinearLayout.VERTICAL);
-        root.addView(trackBox, Ui.full(this, 4));
+        Ui.contentRow(this, tracks, trackBox);
         refreshTracks();
-        root.addView(Ui.meta(this, "Sixteen original tracks written for this app, 8-bit and gothic. "
-                + "It pauses for calls and when another app plays sound."), Ui.full(this, 8));
+        int opens = MusicPlayer.opens(this);
+        root.addView(Ui.panelNote(this, "Opened " + opens + (opens == 1 ? " time" : " times")
+                + ". The soundtrack carries on from where it stopped, and pauses for calls and other apps' sound."));
         Button saveMusic = Ui.button(this, "Save the MP3s to a folder", false);
         saveMusic.setOnClickListener(v -> {
             MusicPlayer.holdForExternal();
             startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_SAVE_MUSIC);
         });
-        root.addView(saveMusic, Ui.full(this, 8));
+        LinearLayout.LayoutParams sl = Ui.full(this, 12);
+        sl.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        root.addView(saveMusic, sl);
+    }
 
-        root.addView(Ui.section(this, "Diagnostics"));
-        diagLine = Ui.mono(this, "");
-        root.addView(diagLine);
+    // ------------------------------------------------------------------ about and help
+
+    private void buildAbout(LinearLayout root) {
+        Ui.Panel about = panel(root, "PDF Scan");
+        LinearLayout ab = new LinearLayout(this);
+        ab.setOrientation(LinearLayout.VERTICAL);
+        ab.addView(Ui.label(this, "Version " + BuildConfig.VERSION_NAME));
+        ab.addView(Ui.meta(this, "Scans, text and signatures stay on this phone unless you export or upload them. "
+                + "Open source: code under the Apache License 2.0, music under CC BY 4.0. © 2026 Anamol Gaur."), Ui.full(this, 4));
+        Ui.contentRow(this, about, ab);
+
+        Ui.Panel diag = panel(root, "Diagnostics");
+        LinearLayout db = new LinearLayout(this);
+        db.setOrientation(LinearLayout.VERTICAL);
+        diagLine = Ui.meta(this, "");
+        db.addView(diagLine);
         Button shareReport = Ui.button(this, "Share report", false);
         Button clearReport = Ui.button(this, "Clear", false);
         shareReport.setOnClickListener(v -> shareReport());
@@ -252,23 +572,15 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
             refreshDiag();
             Ui.toast(this, "Problem log cleared");
         });
-        root.addView(Ui.row(this, shareReport, clearReport), Ui.full(this, 8));
-
-        root.addView(Ui.section(this, "About"));
-        root.addView(Ui.mono(this, "PDF Scan " + BuildConfig.VERSION_NAME
-                + "\nScans, text and signatures stay on this phone unless you export or upload them."
-                + "\nOpen source: code under the Apache License 2.0, music under CC BY 4.0."
-                + " \u00A9 2026 Anamol Gaur."));
-
-        setContentView(page);
-        refreshDrive();
-        refreshPhone();
+        db.addView(Ui.row(this, shareReport, clearReport), Ui.full(this, 10));
+        Ui.contentRow(this, diag, db);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         StatusBus.add(this);
+        refreshSummaries();
         refreshLanguages();
         refreshBin();
         refreshSpace();
@@ -294,10 +606,12 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
     /** Rebuilds every screen in the new look, coming back here. */
     private void restyle() {
         Ui.applyTheme(Prefs.theme(this), Prefs.accent(this), Prefs.systemNight(this));
+        Ui.applyLayout(Prefs.textSize(this), Prefs.font(this), Prefs.corners(this), Prefs.compact(this));
         startActivities(new android.content.Intent[]{
                 new android.content.Intent(this, MainActivity.class).addFlags(
                         android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK),
-                new android.content.Intent(this, SettingsActivity.class)});
+                new android.content.Intent(this, SettingsActivity.class),
+                open(this, page)});
         overridePendingTransition(0, 0);
     }
 
@@ -404,22 +718,29 @@ public class SettingsActivity extends Activity implements StatusBus.Listener {
             long[] r = new DocStore(this).spaceUsed();
             s[0] = r[0];
             s[1] = r[1];
-        }, () -> spaceLine.setText("Scans use " + MainActivity.size(s[0]) + ", of which original photos "
-                + MainActivity.size(s[1]) + "."), null);
+        }, () -> {
+            spaceLine.setText(MainActivity.size(s[1]) + " of " + MainActivity.size(s[0]) + " used by scans");
+            if (spaceMeterBox != null) {
+                spaceMeterBox.removeAllViews();
+                spaceMeterBox.addView(Ui.meter(this, s[0] > 0 ? s[1] / (float) s[0] : 0f),
+                        new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 6)));
+            }
+        }, null);
     }
 
     private void refreshBin() {
         if (binLine == null) return;
         final DocStore store = new DocStore(this);
         int n = store.trashCount();
-        binLine.setText(n == 0 ? "Recycle bin \u00B7 empty" : "Recycle bin \u00B7 " + n + (n == 1 ? " item" : " items"));
+        binLine.setText(n == 0 ? "Empty" : n + (n == 1 ? " item, kept 30 days" : " items, kept 30 days"));
+        binLine.setVisibility(View.VISIBLE);
     }
 
     private void refreshDiag() {
         if (diagLine == null) return;
         int n = Diag.crashCount();
         diagLine.setText((n == 0 ? "No crashes recorded." : n + (n == 1 ? " crash" : " crashes") + " recorded.")
-                + " Problems are logged privately on this phone. Share the report with whoever is fixing the app.");
+                + " Problems are logged privately on this phone, without file names. Share the report only if you want to.");
     }
 
     private void shareReport() {
